@@ -23,21 +23,20 @@ class BeerRecord:
     abv: float | None
     ibu: int | None
     tapGroup: str
-    category: str  # "on_tap", "guest_na", etc.
+    category: str
     sourceUrl: str
     lastScraped: str
 
 
 def slugify(text: str) -> str:
     text = text.lower()
-    text = re.sub(r"['’]", "", text)      # remove apostrophes
+    text = re.sub(r"[’']", "", text)
     text = re.sub(r"[^a-z0-9]+", "-", text)
-    text = re.sub(r"-+", "-", text).strip("-")
-    return text
+    text = re.sub(r"-+", "-", text)
+    return text.strip("-")
 
 
 def fetch_html(url: str) -> str:
-    # Pretend to be a real browser – some sites send different HTML to "bots"
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -50,8 +49,13 @@ def fetch_html(url: str) -> str:
     return resp.text
 
 
-def parse_abv_ibu_and_style_from_line(line: str) -> tuple[float | None, int | None, str | None, str | None]:
-    """
-    Examples:
-      '5.3% ABV | 22 IBU | 1700 Brewing'
-      '(Honey Bourbon Barrel Coffee) • Belgian Golden Strong | 9.2% ABV | N/A IB
+def parse_stats_line(line: str):
+    abv = None
+    ibu = None
+    style_from_line = None
+    producer_name = None
+
+    # Producer = last part after |
+    parts = [p.strip() for p in line.split("|")]
+    if parts:
+        producer_name = parts[-1]
