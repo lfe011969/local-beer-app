@@ -287,65 +287,14 @@
   </div>
 
   <script>
-    // --- SAMPLE DATA ---
-    // Replace this later by loading /beers.json via fetch(...)
-    const beers = [
-      {
-        id: "1700-juicy-ipa",
-        breweryName: "1700 Brewing",
-        city: "Newport News",
-        name: "Juicy Juice",
-        style: "New England IPA",
-        abv: 6.8,
-        ibu: 40,
-        description: "Hazy IPA bursting with citrus and tropical fruit.",
-        lastUpdated: "2025-12-01"
-      },
-      {
-        id: "1700-lager",
-        breweryName: "1700 Brewing",
-        city: "Newport News",
-        name: "Fort Victory Lager",
-        style: "American Lager",
-        abv: 4.9,
-        ibu: 18,
-        description: "Crisp, clean lager brewed for easy drinking.",
-        lastUpdated: "2025-12-01"
-      },
-      {
-        id: "tradition-red",
-        breweryName: "Tradition Brewing Company",
-        city: "Newport News",
-        name: "Red Willie",
-        style: "Red Ale",
-        abv: 5.5,
-        ibu: 25,
-        description: "Malty red ale with caramel notes and a smooth finish.",
-        lastUpdated: "2025-12-02"
-      },
-      {
-        id: "tradition-ipa",
-        breweryName: "Tradition Brewing Company",
-        city: "Newport News",
-        name: "Mosaic Sunrise",
-        style: "American IPA",
-        abv: 6.3,
-        ibu: 55,
-        description: "Classic IPA featuring Mosaic hops and bright bitterness.",
-        lastUpdated: "2025-12-02"
-      },
-      {
-        id: "capstan-stout",
-        breweryName: "Capstan Bar Brewing Company",
-        city: "Hampton",
-        name: "Shipwright Stout",
-        style: "Milk Stout",
-        abv: 6.0,
-        ibu: 30,
-        description: "Roasty stout with chocolate and subtle sweetness.",
-        lastUpdated: "2025-11-30"
-      }
-    ];
+    fetch("beers.json")
+  .then(r => r.json())
+  .then(json => {
+    window.beers = json;
+    initFilters();
+    renderBeers();
+  });
+
 
     // --- Build dynamic filter options from data ---
     const breweryFilter = document.getElementById("breweryFilter");
@@ -500,3 +449,4 @@
   </script>
 </body>
 </html>
+
