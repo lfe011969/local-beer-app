@@ -50,15 +50,16 @@ def parse_abv_ibu_and_style_from_line(line: str) -> tuple[float | None, int | No
     Given a line like:
       '5.3% ABV | 22 IBU | 1700 Brewing'
       '(Honey Bourbon Barrel Coffee) • Belgian Golden Strong | 9.2% ABV | N/A IBU | 1700 Brewing'
+      '(Orange, Passion Fruit, Guava) • 4% ABV | 10 IBU | 1700 Brewing'
     return (abv, ibu, style_from_line, producer_name)
     """
-    # Extract producer name (last chunk after |)
+    # Producer (last chunk after '|')
     producer_name = None
     chunks = [c.strip() for c in line.split("|")]
     if chunks:
-        producer_name_guess = chunks[-1].strip()
-        if producer_name_guess:
-            producer_name = producer_name_guess
+        candidate = chunks[-1].strip()
+        if candidate:
+            producer_name = candidate
 
     # ABV
     abv = None
@@ -74,7 +75,7 @@ def parse_abv_ibu_and_style_from_line(line: str) -> tuple[float | None, int | No
         if val != "N/A":
             ibu = int(val)
 
-    # Style (if present between '•' and '|' or in the middle)
+    # Style between "•" and "|" if present
     style_from_line = None
     if "•" in line and "|" in line:
         after_bullet = line.split("•", 1)[1]
@@ -87,10 +88,9 @@ def parse_abv_ibu_and_style_from_line(line: str) -> tuple[float | None, int | No
 
 def parse_beer_header(text: str) -> tuple[str, str | None]:
     """
-    Turn something like:
-        '1. Plain Old Lager (P.O.L.), Lager - Vienna'
-        '12. Minute of Angle MOA'
-    into (name, style_from_header_or_none)
+    '1. Plain Old Lager (P.O.L.), Lager - Vienna'
+    '12. Minute of Angle MOA'
+    -> (beer_name, style_from_header_or_none)
     """
     text = text.strip()
     m = re.match(r"^\d+\.\s*(.+)$", text)
@@ -100,7 +100,6 @@ def parse_beer_header(text: str) -> tuple[str, str | None]:
     name = text
     style = None
 
-    # If there's a comma, assume 'Name, Style'
     if "," in text:
         name_part, style_part = text.split(",", 1)
         name = name_part.strip()
@@ -114,77 +113,80 @@ def parse_1700_page(html: str) -> list[BeerRecord]:
     beers: list[BeerRecord] = []
     now_str = datetime.now(tz=timezone.utc).isoformat()
 
-    # Get all tap group headings (h2) on the page.
-    tap_groups = soup.find_all("h2")
-    print(f"Found {len(tap_groups)} tap groups")  # helpful debug
+    current_tap_group = None
+    current_category = "on_tap"
 
-    for h2 in tap_groups:
-        tap_group = h2.get_text(" ", strip=True)
-        if not tap_group:
-            continue
+    # Walk all h2 and h3 in document order
+    for node in soup.find_all(["h2", "h3"]):
+        text = node.get_text(" ", strip=True)
 
-        # classify category (simple rule: Reserves = guest/NA, others = on_tap)
-        if "Reserves" in tap_group:
-            category = "guest_na"
-        else:
-            category = "on_tap"
+        if node.name == "h2":
+            # We're only interested in the tap group sections
+            if any(keyword in text for keyword in [
+                "Taps -",       # Air Force / Army / Marine / Coast Guard
+                "Spec Ops",
+                "Odd Stuff",
+                "Reserves -"
+            ]):
+                current_tap_group = text
+                current_category = "guest_na" if "Reserves" in text else "on_tap"
+            else:
+                # e.g. 'Menus' etc – ignore
+                continue
 
-        # Walk forward through siblings until we hit the next h2
-        node = h2.next_sibling
-        while node:
-            if isinstance(node, Tag) and node.name == "h2":
-                break  # next tap group
+        elif node.name == "h3":
+            if not current_tap_group:
+                # h3 before a tap group – ignore just in case
+                continue
 
-            if isinstance(node, Tag) and node.name == "h3":
-                header_text = node.get_text(" ", strip=True)
-                beer_name, style_from_header = parse_beer_header(header_text)
+            header_text = text
+            beer_name, style_from_header = parse_beer_header(header_text)
 
-                # Find ABV/IBU line after the h3
-                abv_line = None
-                info_node = node.next_sibling
-                while info_node and not (isinstance(info_node, Tag) and info_node.name in ("h2", "h3")):
-                    text = ""
-                    if isinstance(info_node, Tag):
-                        text = info_node.get_text(" ", strip=True)
-                    elif isinstance(info_node, NavigableString):
-                        text = str(info_node).strip()
+            # Find ABV/IBU line just after this h3
+            abv_line = None
+            sibling = node.next_sibling
+            while sibling:
+                if isinstance(sibling, Tag) and sibling.name in ("h2", "h3"):
+                    break  # reached next beer or next group
 
-                    if text:
-                        if "ABV" in text and "IBU" in text and abv_line is None:
-                            abv_line = text
-                            break
-                    info_node = info_node.next_sibling
+                line_text = ""
+                if isinstance(sibling, Tag):
+                    line_text = sibling.get_text(" ", strip=True)
+                elif isinstance(sibling, NavigableString):
+                    line_text = str(sibling).strip()
 
-                if not abv_line:
-                    print(f"Skipping beer with no ABV/IBU line: {beer_name}")
-                    node = node.next_sibling
-                    continue
+                if line_text and "ABV" in line_text and "IBU" in line_text:
+                    abv_line = line_text
+                    break
 
-                abv, ibu, style_from_line, producer_name = parse_abv_ibu_and_style_from_line(abv_line)
+                sibling = sibling.next_sibling
 
-                style = style_from_header or style_from_line
-                if not producer_name:
-                    producer_name = BREWERY_NAME
+            if not abv_line:
+                # No stats line – skip this beer
+                continue
 
-                beer_id = f"{slugify(BREWERY_NAME)}-{slugify(beer_name)}"
+            abv, ibu, style_from_line, producer_name = parse_abv_ibu_and_style_from_line(abv_line)
+            style = style_from_header or style_from_line
+            if not producer_name:
+                producer_name = BREWERY_NAME
 
-                record = BeerRecord(
-                    id=beer_id,
-                    breweryName=BREWERY_NAME,
-                    breweryCity=BREWERY_CITY,
-                    producerName=producer_name,
-                    name=beer_name,
-                    style=style,
-                    abv=abv,
-                    ibu=ibu,
-                    tapGroup=tap_group,
-                    category=category,
-                    sourceUrl=DRINK_MENU_URL,
-                    lastScraped=now_str,
-                )
-                beers.append(record)
+            beer_id = f"{slugify(BREWERY_NAME)}-{slugify(beer_name)}"
 
-            node = node.next_sibling
+            record = BeerRecord(
+                id=beer_id,
+                breweryName=BREWERY_NAME,
+                breweryCity=BREWERY_CITY,
+                producerName=producer_name,
+                name=beer_name,
+                style=style,
+                abv=abv,
+                ibu=ibu,
+                tapGroup=current_tap_group,
+                category=current_category,
+                sourceUrl=DRINK_MENU_URL,
+                lastScraped=now_str,
+            )
+            beers.append(record)
 
     print(f"Parsed {len(beers)} beers from 1700")
     return beers
