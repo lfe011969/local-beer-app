@@ -29,6 +29,11 @@ jobs:
         run: |
           python scrapers/scrape_1700.py
 
+      - name: List files after scraper
+        run: |
+          echo "DEBUG: files in workspace after scraper:"
+          ls -la
+
       - name: Move output to beers.json at root
         run: |
           if [ -f beers_1700.json ]; then
