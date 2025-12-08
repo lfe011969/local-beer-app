@@ -55,7 +55,44 @@ def parse_stats_line(line: str):
     style_from_line = None
     producer_name = None
 
-    # Producer = last part after |
     parts = [p.strip() for p in line.split("|")]
     if parts:
         producer_name = parts[-1]
+
+    m_abv = re.search(r"(\d+(?:\.\d+)?)\s*%?\s*ABV", line, re.IGNORECASE)
+    if m_abv:
+        abv = float(m_abv.group(1))
+
+    m_ibu = re.search(r"(\d+|N/A)\s*IBU", line, re.IGNORECASE)
+    if m_ibu:
+        v = m_ibu.group(1).upper()
+        if v != "N/A":
+            ibu = int(v)
+
+    if "•" in line and "|" in line:
+        after = line.split("•", 1)[1]
+        style_from_line = after.split("|", 1)[0].strip()
+
+    return abv, ibu, style_from_line, producer_name
+
+
+def parse_header(text: str):
+    text = text.strip()
+    m = re.match(r"^\d+\.\s*(.+)$", text)
+    if m:
+        text = m.group(1).strip()
+
+    if "," in text:
+        name_part, style_part = text.split(",", 1)
+        return name_part.strip(), style_part.strip()
+
+    return text, None
+
+
+def parse_1700_page(html: str):
+    soup = BeautifulSoup(html, "html.parser")
+    beers = []
+    now = datetime.now(timezone.utc).isoformat()
+
+    headings = soup.find_all(["h2", "h3"])
+    print("DEBUG: found", len(headings), "<h2>/<h3> headings")
