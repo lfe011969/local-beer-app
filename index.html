@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Hampton Roads Beer Finder</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #111827;
+      background: #f3f4f6;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: radial-gradient(circle at top left, #fbbf24 0, #f9fafb 40%, #111827 140%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    .app {
+      max-width: 1100px;
+      width: 100%;
+      margin: 32px;
+      background: rgba(249, 250, 251, 0.98);
+      backdrop-filter: blur(10px);
+      border-radius: 18px;
+      box-shadow:
+        0 20px 25px -5px rgba(0, 0, 0, 0.15),
+        0 10px 10px -5px rgba(0, 0, 0, 0.1);
+      padding: 24px 24px 28px;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 1.7rem;
+      letter-spacing: 0.03em;
+    }
+
+    header p {
+      margin: 0;
+      font-size: 0.9rem;
+      color: #4b5563;
+    }
+
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    @media (max-width: 900px) {
+      .filters {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 640px) {
+      .filters {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .filters label {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #6b7280;
+    }
+
+    .filters select,
+    .filters input {
+      border-radius: 999px;
+      border: 1px solid #e5e7eb;
+      padding: 7px 10px;
+      font-size: 0.9rem;
+      outline: none;
+      background: #ffffff;
+      transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+    }
+
+    .filters select:focus,
+    .filters input:focus {
+      border-color: #f59e0b;
+      box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
+      background: #fff7ed;
+    }
+
+    .summary {
+      font-size: 0.85rem;
+      color: #4b5563;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .summary strong {
+      color: #111827;
+    }
+
+    .beers-list {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      margin-top: 4px;
+    }
+
+    .brewery-group {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 14px 16px 16px;
+      border: 1px solid #e5e7eb;
+    }
+
+    .brewery-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      border-bottom: 1px solid #f3f4f6;
+      padding-bottom: 6px;
+      margin-bottom: 10px;
+    }
+
+    .brewery-name {
+      font-size: 1.05rem;
+      font-weight: 600;
+    }
+
+    .brewery-meta {
+      font-size: 0.8rem;
+      color: #6b7280;
+    }
+
+    .beer-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    @media (max-width: 800px) {
+      .beer-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .beer-card {
+      border-radius: 14px;
+      border: 1px solid #e5e7eb;
+      padding: 8px 10px;
+      background: linear-gradient(135deg, #fffbeb, #ffffff);
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .beer-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at top right, rgba(251, 191, 36, 0.11), transparent 50%);
+      pointer-events: none;
+    }
+
+    .beer-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .beer-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-size: 0.78rem;
+      color: #6b7280;
+    }
+
+    .pill {
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid #fbbf24;
+      background: #fef3c7;
+      color: #92400e;
+      font-size: 0.75rem;
+      white-space: nowrap;
+    }
+
+    .pill.secondary {
+      border-color: #e5e7eb;
+      background: #f3f4f6;
+      color: #374151;
+    }
+
+    .beer-desc {
+      font-size: 0.8rem;
+      color: #4b5563;
+      margin-top: 4px;
+    }
+
+    .empty-state {
+      border-radius: 14px;
+      border: 1px dashed #d1d5db;
+      padding: 14px;
+      text-align: center;
+      font-size: 0.9rem;
+      color: #6b7280;
+      background: #f9fafb;
+      margin-top: 12px;
+    }
+
+    a.link {
+      color: #d97706;
+      text-decoration: none;
+    }
+
+    a.link:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <h1>Hampton Roads Beer Finder</h1>
+        <p>See what’s on tap at local breweries, sorted by brewery and style.</p>
+      </div>
+      <div style="font-size:0.8rem; text-align:right; color:#6b7280;">
+        Prototype · Data source: local brewery sites
+      </div>
+    </header>
+
+    <section class="filters">
+      <label>
+        Brewery
+        <select id="breweryFilter">
+          <option value="all">All Breweries</option>
+        </select>
+      </label>
+      <label>
+        Style
+        <select id="styleFilter">
+          <option value="all">All Styles</option>
+        </select>
+      </label>
+      <label>
+        Search
+        <input id="searchInput" type="text" placeholder="Search by beer name…" />
+      </label>
+      <label>
+        Sort
+        <select id="sortSelect">
+          <option value="brewery-style-name">Brewery → Style → Name</option>
+          <option value="style-brewery-name">Style → Brewery → Name</option>
+          <option value="name">Beer Name (A–Z)</option>
+        </select>
+      </label>
+    </section>
+
+    <section class="summary">
+      <div><strong id="beerCount">0</strong> beers displayed</div>
+      <div id="activeFilters"></div>
+    </section>
+
+    <section id="beersContainer" class="beers-list"></section>
+  </div>
+
+  <script>
+    // --- SAMPLE DATA ---
+    // Replace this later by loading /beers.json via fetch(...)
+    const beers = [
+      {
+        id: "1700-juicy-ipa",
+        breweryName: "1700 Brewing",
+        city: "Newport News",
+        name: "Juicy Juice",
+        style: "New England IPA",
+        abv: 6.8,
+        ibu: 40,
+        description: "Hazy IPA bursting with citrus and tropical fruit.",
+        lastUpdated: "2025-12-01"
+      },
+      {
+        id: "1700-lager",
+        breweryName: "1700 Brewing",
+        city: "Newport News",
+        name: "Fort Victory Lager",
+        style: "American Lager",
+        abv: 4.9,
+        ibu: 18,
+        description: "Crisp, clean lager brewed for easy drinking.",
+        lastUpdated: "2025-12-01"
+      },
+      {
+        id: "tradition-red",
+        breweryName: "Tradition Brewing Company",
+        city: "Newport News",
+        name: "Red Willie",
+        style: "Red Ale",
+        abv: 5.5,
+        ibu: 25,
+        description: "Malty red ale with caramel notes and a smooth finish.",
+        lastUpdated: "2025-12-02"
+      },
+      {
+        id: "tradition-ipa",
+        breweryName: "Tradition Brewing Company",
+        city: "Newport News",
+        name: "Mosaic Sunrise",
+        style: "American IPA",
+        abv: 6.3,
+        ibu: 55,
+        description: "Classic IPA featuring Mosaic hops and bright bitterness.",
+        lastUpdated: "2025-12-02"
+      },
+      {
+        id: "capstan-stout",
+        breweryName: "Capstan Bar Brewing Company",
+        city: "Hampton",
+        name: "Shipwright Stout",
+        style: "Milk Stout",
+        abv: 6.0,
+        ibu: 30,
+        description: "Roasty stout with chocolate and subtle sweetness.",
+        lastUpdated: "2025-11-30"
+      }
+    ];
+
+    // --- Build dynamic filter options from data ---
+    const breweryFilter = document.getElementById("breweryFilter");
+    const styleFilter = document.getElementById("styleFilter");
+    const searchInput = document.getElementById("searchInput");
+    const sortSelect = document.getElementById("sortSelect");
+    const beersContainer = document.getElementById("beersContainer");
+    const beerCount = document.getElementById("beerCount");
+    const activeFilters = document.getElementById("activeFilters");
+
+    function initFilters() {
+      const breweryNames = Array.from(new Set(beers.map(b => b.breweryName))).sort();
+      const styles = Array.from(new Set(beers.map(b => b.style))).sort();
+
+      breweryNames.forEach(name => {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        breweryFilter.appendChild(opt);
+      });
+
+      styles.forEach(style => {
+        const opt = document.createElement("option");
+        opt.value = style;
+        opt.textContent = style;
+        styleFilter.appendChild(opt);
+      });
+    }
+
+    function getFilteredAndSortedBeers() {
+      const breweryVal = breweryFilter.value;
+      const styleVal = styleFilter.value;
+      const searchVal = searchInput.value.trim().toLowerCase();
+      const sortVal = sortSelect.value;
+
+      let filtered = beers.filter(b => {
+        if (breweryVal !== "all" && b.breweryName !== breweryVal) return false;
+        if (styleVal !== "all" && b.style !== styleVal) return false;
+        if (searchVal) {
+          const haystack = (b.name + " " + b.description + " " + b.style).toLowerCase();
+          if (!haystack.includes(searchVal)) return false;
+        }
+        return true;
+      });
+
+      const collator = new Intl.Collator("en", { sensitivity: "base" });
+
+      filtered.sort((a, b) => {
+        if (sortVal === "name") {
+          return collator.compare(a.name, b.name);
+        }
+        if (sortVal === "style-brewery-name") {
+          const byStyle = collator.compare(a.style, b.style);
+          if (byStyle !== 0) return byStyle;
+          const byBrewery = collator.compare(a.breweryName, b.breweryName);
+          if (byBrewery !== 0) return byBrewery;
+          return collator.compare(a.name, b.name);
+        }
+        // default: brewery-style-name
+        const byBrewery = collator.compare(a.breweryName, b.breweryName);
+        if (byBrewery !== 0) return byBrewery;
+        const byStyle = collator.compare(a.style, b.style);
+        if (byStyle !== 0) return byStyle;
+        return collator.compare(a.name, b.name);
+      });
+
+      return filtered;
+    }
+
+    function renderBeers() {
+      const data = getFilteredAndSortedBeers();
+      beersContainer.innerHTML = "";
+      beerCount.textContent = data.length;
+
+      // Active filters summary
+      const parts = [];
+      if (breweryFilter.value !== "all") parts.push(`Brewery: ${breweryFilter.value}`);
+      if (styleFilter.value !== "all") parts.push(`Style: ${styleFilter.value}`);
+      if (searchInput.value.trim()) parts.push(`Search: "${searchInput.value.trim()}"`);
+      activeFilters.textContent = parts.length ? parts.join(" · ") : "No filters applied";
+
+      if (!data.length) {
+        beersContainer.innerHTML = `
+          <div class="empty-state">
+            No beers match your filters right now. Try clearing a filter or adjusting your search.
+          </div>
+        `;
+        return;
+      }
+
+      // Group by brewery
+      const groups = {};
+      for (const beer of data) {
+        if (!groups[beer.breweryName]) {
+          groups[beer.breweryName] = {
+            city: beer.city,
+            beers: []
+          };
+        }
+        groups[beer.breweryName].beers.push(beer);
+      }
+
+      Object.keys(groups).sort().forEach(breweryName => {
+        const group = groups[breweryName];
+        const section = document.createElement("section");
+        section.className = "brewery-group";
+
+        const header = document.createElement("div");
+        header.className = "brewery-header";
+        header.innerHTML = `
+          <div class="brewery-name">${breweryName}</div>
+          <div class="brewery-meta">${group.city} · ${group.beers.length} beer(s)</div>
+        `;
+        section.appendChild(header);
+
+        const grid = document.createElement("div");
+        grid.className = "beer-grid";
+
+        group.beers.forEach(beer => {
+          const card = document.createElement("article");
+          card.className = "beer-card";
+
+          const abvStr = beer.abv ? `${beer.abv.toFixed(1)}% ABV` : "ABV N/A";
+          const ibuStr = (typeof beer.ibu === "number") ? `${beer.ibu} IBU` : "IBU N/A";
+
+          card.innerHTML = `
+            <div class="beer-title">${beer.name}</div>
+            <div class="beer-meta">
+              <span class="pill">${beer.style}</span>
+              <span class="pill secondary">${abvStr}</span>
+              <span class="pill secondary">${ibuStr}</span>
+            </div>
+            ${beer.description ? `<div class="beer-desc">${beer.description}</div>` : ""}
+          `;
+          grid.appendChild(card);
+        });
+
+        section.appendChild(grid);
+        beersContainer.appendChild(section);
+      });
+    }
+
+    // Hook up events
+    breweryFilter.addEventListener("change", renderBeers);
+    styleFilter.addEventListener("change", renderBeers);
+    sortSelect.addEventListener("change", renderBeers);
+    searchInput.addEventListener("input", renderBeers);
+
+    // Init
+    initFilters();
+    renderBeers();
+  </script>
+</body>
+</html>
