@@ -31,7 +31,14 @@ jobs:
 
       - name: Move output to beers.json at root
         run: |
-          mv beers_1700.json beers.json
+          if [ -f beers_1700.json ]; then
+            mv beers_1700.json beers.json
+          else
+            echo "WARNING: beers_1700.json not created!"
+          ls -la
+          exit 1
+        fi
+
 
       - name: Commit and push updated beers.json
         env:
