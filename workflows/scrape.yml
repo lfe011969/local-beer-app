@@ -1,1 +1,34 @@
+name: Scrape Breweries
+
+on:
+  schedule:
+    - cron: "0 */12 * * *"  # scrape twice per day
+  workflow_dispatch:        # allows manual run
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: pip install requests beautifulsoup4
+
+    - name: Run 1700 scraper
+      run: python scrapers/scrape_1700.py
+
+    - name: Move JSON into public folder
+      run: mv beers_1700.json public/beers.json
+
+    - name: Commit changes
+      uses: stefanzweifel/git-auto-commit-action@v4
+      with:
+        commit_message: "Update beers.json from scraper"
 
