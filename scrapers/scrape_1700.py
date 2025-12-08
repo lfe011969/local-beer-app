@@ -103,15 +103,12 @@ def parse_1700_page(html: str):
     current_category = "on_tap"
 
     for node in headings:
-        text = node.get_text(" ", strip=True)
-
-        for node in headings:
     text = node.get_text(" ", strip=True)
 
+    # ---- TAP GROUP HEADERS (Untappd <h4>) ----
     if node.name == "h4":
-        # tap group sections (Air Force, Army, etc.)
         if (
-            "Taps" in text         # Air Force Taps-Light/Lager, etc.
+            "Taps" in text
             or "Spec Ops" in text
             or "Odd Stuff" in text
             or "Reserves" in text
@@ -122,13 +119,14 @@ def parse_1700_page(html: str):
         else:
             continue
 
+    # ---- BEER ENTRIES (Untappd <h5>) ----
     elif node.name == "h5":
-        # beer entries
         if not current_group:
             continue
 
         beer_name, style_from_header = parse_header(text)
 
+        # Look for the <h6> after <h5> that contains ABV/IBU
         stats_node = node.find_next(
             string=lambda t: isinstance(t, NavigableString)
             and "ABV" in t
@@ -143,7 +141,7 @@ def parse_1700_page(html: str):
         if not producer:
             producer = BREWERY_NAME
 
-        beer_id = slugify(BREWERY_NAME + "-" + beer_name)
+        beer_id = slugify(f"{BREWERY_NAME}-{beer_name}")
 
         beers.append(
             BeerRecord(
@@ -161,6 +159,7 @@ def parse_1700_page(html: str):
                 lastScraped=now,
             )
         )
+
 
 
     print("Parsed", len(beers), "beers from 1700")
