@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import requests
 from bs4 import BeautifulSoup, NavigableString, Tag
 
-DRINK_MENU_URL = "https://1700brewing.beer/newport-news-1700-brewing-drink-menu"
+DRINK_MENU_URL = "https://business.untappd.com/app/boards/55817?page=1"
 
 BREWERY_NAME = "1700 Brewing"
 BREWERY_CITY = "Newport News"
