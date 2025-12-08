@@ -5,6 +5,9 @@ on:
     - cron: "0 */12 * * *"   # Run every 12 hours
   workflow_dispatch:         # Allow manual runs
 
+permissions:
+  contents: write
+  
 jobs:
   scrape:
     runs-on: ubuntu-latest
@@ -13,9 +16,7 @@ jobs:
 
     - name: Checkout repo
       uses: actions/checkout@v4
-      with:
-        persist-credentials: false  # Required for auto-commit action below
-
+      
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -34,11 +35,13 @@ jobs:
         mkdir -p public
         mv beers_1700.json public/beers.json
 
-    - name: Commit updated beers.json
-      uses: stefanzweifel/git-auto-commit-action@v5
-      with:
-        commit_message: "Update beers.json from scraper"
-        commit_user_name: "Local Beer App Bot"
-        commit_user_email: "bot@example.com"
-permissions:
-  contents: write
+    - name: Commit and push updated beers.json
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        git config user.name "Local Beer App Bot"
+        git config user.email "bot@example.com"
+        
+        git add public/beers.json
+        git commit -m "Update beers.json from scraper" || echo "No changes to commit"
+        git push
