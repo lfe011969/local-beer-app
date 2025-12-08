@@ -16,9 +16,8 @@ jobs:
     steps:
     - name: Checkout repo
       uses: actions/checkout@v4
-      # REMOVE persist-credentials: false so the default GITHUB_TOKEN stays set
-      # with:
-      #   persist-credentials: false
+      with:
+        persist-credentials: false   # let git-auto-commit manage credentials
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -45,3 +44,4 @@ jobs:
         commit_user_name: "Local Beer App Bot"
         commit_user_email: "bot@example.com"
         file_pattern: public/beers.json
+        token: ${{ secrets.GITHUB_TOKEN }}   # 👈 this is the important part
