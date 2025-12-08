@@ -44,7 +44,7 @@ jobs:
           git status
 
           # stage file
-          git add public/beers.json
+          git add beers.json
 
           # commit if there are changes; otherwise do nothing
           git commit -m "Update beers.json from scraper" || echo "No changes to commit"
