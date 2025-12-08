@@ -29,10 +29,9 @@ jobs:
         run: |
           python scrapers/scrape_1700.py
 
-      - name: Move output to public/beers.json
+      - name: Move output to beers.json at root
         run: |
-          mkdir -p public
-          mv beers_1700.json public/beers.json
+          mv beers_1700.json beers.json
 
       - name: Commit and push updated beers.json
         env:
