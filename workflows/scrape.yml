@@ -5,43 +5,50 @@ on:
     - cron: "0 */12 * * *"   # Run every 12 hours
   workflow_dispatch:         # Allow manual runs from the Actions tab
 
-# Give this workflow permission to push commits using the GITHUB_TOKEN
 permissions:
-  contents: write
+  contents: write            # allow this workflow to push commits
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v4
-      with:
-        persist-credentials: false   # let git-auto-commit manage credentials
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    - name: Install scraper dependencies
-      run: |
-        pip install requests beautifulsoup4
+      - name: Install scraper dependencies
+        run: |
+          pip install requests beautifulsoup4
 
-    - name: Run 1700 scraper
-      run: |
-        python scrapers/scrape_1700.py
+      - name: Run 1700 scraper
+        run: |
+          python scrapers/scrape_1700.py
 
-    - name: Move output to public/beers.json
-      run: |
-        mkdir -p public
-        mv beers_1700.json public/beers.json
+      - name: Move output to public/beers.json
+        run: |
+          mkdir -p public
+          mv beers_1700.json public/beers.json
 
-    - name: Commit updated beers.json
-      uses: stefanzweifel/git-auto-commit-action@v5
-      with:
-        commit_message: "Update beers.json from scraper"
-        commit_user_name: "Local Beer App Bot"
-        commit_user_email: "bot@example.com"
-        file_pattern: public/beers.json
-        token: ${{ secrets.GITHUB_TOKEN }}   # 👈 this is the important part
+      - name: Commit and push updated beers.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "Local Beer App Bot"
+          git config user.email "bot@example.com"
+
+          # show status for debugging
+          git status
+
+          # stage file
+          git add public/beers.json
+
+          # commit if there are changes; otherwise do nothing
+          git commit -m "Update beers.json from scraper" || echo "No changes to commit"
+
+          # push using the token-based remote set up by actions/checkout
+          git push
