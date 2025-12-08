@@ -2,33 +2,46 @@ name: Scrape Breweries
 
 on:
   schedule:
-    - cron: "0 */12 * * *"  # scrape twice per day
-  workflow_dispatch:        # allows manual run
+    - cron: "0 */12 * * *"   # Run every 12 hours
+  workflow_dispatch:         # Allow manual runs from the Actions tab
+
+# Give this workflow permission to push commits using the GITHUB_TOKEN
+permissions:
+  contents: write
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+    - name: Checkout repo
+      uses: actions/checkout@v4
+      # REMOVE persist-credentials: false so the default GITHUB_TOKEN stays set
+      # with:
+      #   persist-credentials: false
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: "3.11"
 
-    - name: Install dependencies
-      run: pip install requests beautifulsoup4
+    - name: Install scraper dependencies
+      run: |
+        pip install requests beautifulsoup4
 
     - name: Run 1700 scraper
-      run: python scrapers/scrape_1700.py
+      run: |
+        python scrapers/scrape_1700.py
 
-    - name: Move JSON into public folder
-      run: mv beers_1700.json public/beers.json
+    - name: Move output to public/beers.json
+      run: |
+        mkdir -p public
+        mv beers_1700.json public/beers.json
 
-    - name: Commit changes
-      uses: stefanzweifel/git-auto-commit-action@v4
+    - name: Commit updated beers.json
+      uses: stefanzweifel/git-auto-commit-action@v5
       with:
         commit_message: "Update beers.json from scraper"
-
+        commit_user_name: "Local Beer App Bot"
+        commit_user_email: "bot@example.com"
+        file_pattern: public/beers.json
