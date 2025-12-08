@@ -38,7 +38,11 @@ def slugify(text: str) -> str:
 
 def fetch_html(url: str) -> str:
     headers = {
-        "User-Agent": "LocalBeerAppBot/0.1 (contact: youremail@example.com)"
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0 Safari/537.36"
+        )
     }
     resp = requests.get(url, headers=headers, timeout=15)
     resp.raise_for_status()
@@ -112,6 +116,12 @@ def parse_1700_page(html: str) -> list[BeerRecord]:
     soup = BeautifulSoup(html, "html.parser")
     beers: list[BeerRecord] = []
     now_str = datetime.now(tz=timezone.utc).isoformat()
+
+    # DEBUG: see how many h2/h3 we actually get
+    headings = soup.find_all(["h2", "h3"])
+    print(f"DEBUG: found {len(headings)} <h2>/<h3> headings on page")
+    for h in headings[:10]:
+        print("DEBUG heading:", h.name, "-", h.get_text(" ", strip=True)[:80])
 
     current_tap_group = None
     current_category = "on_tap"
