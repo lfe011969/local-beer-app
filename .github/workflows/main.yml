@@ -40,3 +40,5 @@ jobs:
         commit_message: "Update beers.json from scraper"
         commit_user_name: "Local Beer App Bot"
         commit_user_email: "bot@example.com"
+permissions:
+  contents: write
