@@ -152,33 +152,45 @@ def parse_1700_page(html: str) -> list[BeerRecord]:
             header_text = text
             beer_name, style_from_header = parse_beer_header(header_text)
 
-            # Find ABV/IBU line just after this h3
-            abv_line = None
-            sibling = node.next_sibling
-            while sibling:
-                if isinstance(sibling, Tag) and sibling.name in ("h2", "h3"):
-                    break  # reached next beer or next group
+                    header_text = text
+        beer_name, style_from_header = parse_beer_header(header_text)
 
-                line_text = ""
-                if isinstance(sibling, Tag):
-                    line_text = sibling.get_text(" ", strip=True)
-                elif isinstance(sibling, NavigableString):
-                    line_text = str(sibling).strip()
+        # Find the next text snippet in the document that contains both "ABV" and "IBU".
+        # This is usually in a <p> or <strong> right after the h3, but using find_next
+        # is more robust than walking siblings manually.
+        stats_node = node.find_next(
+            string=lambda t: isinstance(t, NavigableString) and "ABV" in t and "IBU" in t
+        )
 
-                if line_text and "ABV" in line_text and "IBU" in line_text:
-                    abv_line = line_text
-                    break
+        if not stats_node:
+            # No stats line – skip this beer
+            continue
 
-                sibling = sibling.next_sibling
+        abv_line = stats_node.strip()
+        abv, ibu, style_from_line, producer_name = parse_abv_ibu_and_style_from_line(abv_line)
 
-            if not abv_line:
-                # No stats line – skip this beer
-                continue
+        style = style_from_header or style_from_line
+        if not producer_name:
+            producer_name = BREWERY_NAME
 
-            abv, ibu, style_from_line, producer_name = parse_abv_ibu_and_style_from_line(abv_line)
-            style = style_from_header or style_from_line
-            if not producer_name:
-                producer_name = BREWERY_NAME
+        beer_id = f"{slugify(BREWERY_NAME)}-{slugify(beer_name)}"
+
+        record = BeerRecord(
+            id=beer_id,
+            breweryName=BREWERY_NAME,
+            breweryCity=BREWERY_CITY,
+            producerName=producer_name,
+            name=beer_name,
+            style=style,
+            abv=abv,
+            ibu=ibu,
+            tapGroup=current_tap_group,
+            category=current_category,
+            sourceUrl=DRINK_MENU_URL,
+            lastScraped=now_str,
+        )
+        beers.append(record)
+
 
             beer_id = f"{slugify(BREWERY_NAME)}-{slugify(beer_name)}"
 
