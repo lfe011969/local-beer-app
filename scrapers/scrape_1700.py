@@ -4,8 +4,7 @@ from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 
 import requests
-from bs4 import BeautifulSoup
-
+from bs4 import BeautifulSoup, NavigableString, Tag
 
 DRINK_MENU_URL = "https://1700brewing.beer/newport-news-1700-brewing-drink-menu"
 
@@ -93,7 +92,6 @@ def parse_beer_header(text: str) -> tuple[str, str | None]:
         '12. Minute of Angle MOA'
     into (name, style_from_header_or_none)
     """
-    # Strip leading '1.' / '12.' / etc
     text = text.strip()
     m = re.match(r"^\d+\.\s*(.+)$", text)
     if m:
@@ -113,33 +111,17 @@ def parse_beer_header(text: str) -> tuple[str, str | None]:
 
 def parse_1700_page(html: str) -> list[BeerRecord]:
     soup = BeautifulSoup(html, "html.parser")
-
-    # Get all H2 sections under "Our Drinks"
-    # We'll treat every h2 as a tap group title, then walk until the next h2.
     beers: list[BeerRecord] = []
-
-    # To be safe, find the "Our Drinks" heading and then look for h2 after it
-    our_drinks_h1 = None
-    for h1 in soup.find_all(["h1", "h2"]):
-        if "Our Drinks" in h1.get_text(strip=True):
-            our_drinks_h1 = h1
-            break
-
-    if our_drinks_h1 is None:
-        raise RuntimeError("Couldn't find 'Our Drinks' anchor in page")
-
-    # From that anchor, collect subsequent h2s as tap groups
-    tap_groups = []
-    node = our_drinks_h1.find_next_sibling()
-    while node:
-        if getattr(node, "name", None) == "h2":
-            tap_groups.append(node)
-        node = node.next_sibling
-
     now_str = datetime.now(tz=timezone.utc).isoformat()
+
+    # Get all tap group headings (h2) on the page.
+    tap_groups = soup.find_all("h2")
+    print(f"Found {len(tap_groups)} tap groups")  # helpful debug
 
     for h2 in tap_groups:
         tap_group = h2.get_text(" ", strip=True)
+        if not tap_group:
+            continue
 
         # classify category (simple rule: Reserves = guest/NA, others = on_tap)
         if "Reserves" in tap_group:
@@ -147,44 +129,43 @@ def parse_1700_page(html: str) -> list[BeerRecord]:
         else:
             category = "on_tap"
 
-        # Walk siblings until next h2 to find h3 beer headers
-        node = h2.find_next_sibling()
-        while node and not (getattr(node, "name", None) == "h2"):
-            if getattr(node, "name", None) == "h3":
+        # Walk forward through siblings until we hit the next h2
+        node = h2.next_sibling
+        while node:
+            if isinstance(node, Tag) and node.name == "h2":
+                break  # next tap group
+
+            if isinstance(node, Tag) and node.name == "h3":
                 header_text = node.get_text(" ", strip=True)
                 beer_name, style_from_header = parse_beer_header(header_text)
 
-                # Find ABV/IBU line and any description immediately associated
+                # Find ABV/IBU line after the h3
                 abv_line = None
-                description = None
+                info_node = node.next_sibling
+                while info_node and not (isinstance(info_node, Tag) and info_node.name in ("h2", "h3")):
+                    text = ""
+                    if isinstance(info_node, Tag):
+                        text = info_node.get_text(" ", strip=True)
+                    elif isinstance(info_node, NavigableString):
+                        text = str(info_node).strip()
 
-                info_node = node.find_next_sibling()
-                while info_node and getattr(info_node, "name", None) not in ("h2", "h3"):
-                    text = info_node.get_text(" ", strip=True) if hasattr(info_node, "get_text") else str(info_node).strip()
                     if text:
                         if "ABV" in text and "IBU" in text and abv_line is None:
                             abv_line = text
-                        else:
-                            # could be description; we only save first non-ABV line
-                            if description is None:
-                                description = text
+                            break
                     info_node = info_node.next_sibling
 
                 if not abv_line:
-                    # If we somehow didn't find an ABV/IBU line, skip this beer
+                    print(f"Skipping beer with no ABV/IBU line: {beer_name}")
                     node = node.next_sibling
                     continue
 
                 abv, ibu, style_from_line, producer_name = parse_abv_ibu_and_style_from_line(abv_line)
 
-                # Decide final style
                 style = style_from_header or style_from_line
-
-                # Producer default to brewery if not parsed
                 if not producer_name:
                     producer_name = BREWERY_NAME
 
-                # Create an id; include brewery + beer name
                 beer_id = f"{slugify(BREWERY_NAME)}-{slugify(beer_name)}"
 
                 record = BeerRecord(
@@ -205,6 +186,7 @@ def parse_1700_page(html: str) -> list[BeerRecord]:
 
             node = node.next_sibling
 
+    print(f"Parsed {len(beers)} beers from 1700")
     return beers
 
 
