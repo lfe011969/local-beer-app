@@ -23,7 +23,7 @@ class BeerRecord:
     abv: float | None
     ibu: int | None
     tapGroup: str          # e.g. "On Tap", "Coming Soon"
-    category: str          # e.g. "on_tap", "coming_soon"
+    category: str          # "on_tap" or "coming_soon"
     sourceUrl: str
     lastScraped: str
 
@@ -54,57 +54,59 @@ def parse_billsburg_page(html: str):
     beers: list[BeerRecord] = []
     now = datetime.now(timezone.utc).isoformat()
 
-    # Find the node that marks the "Coming Soon" section so we can distinguish groups
-    coming_soon_tag = None
-    for h in soup.find_all(["h2", "h3", "h4"]):
-        if "coming soon" in h.get_text(strip=True).lower():
-            coming_soon_tag = h
-            break
+    # We'll treat an <h2>/<h3>/<h4> containing "Coming Soon" as the divider
+    def ul_is_coming_soon(ul: Tag) -> bool:
+        heading = ul.find_previous(
+            lambda tag: isinstance(tag, Tag)
+            and tag.name in ["h2", "h3", "h4"]
+            and "coming soon" in tag.get_text(strip=True).lower()
+        )
+        return heading is not None
 
-    def is_coming_soon(heading: Tag) -> bool:
-        # If we never found a Coming Soon header, treat everything as on tap
-        if coming_soon_tag is None:
-            return False
-        # heading comes after coming_soon_tag in document order?
-        for elem in soup.descendants:
-            if elem is coming_soon_tag:
-                # from this point on, anything we see is "coming soon"
-                seen_marker = True
-            if elem is heading:
-                # if we hit heading before marker, it's not coming soon
-                return False
-        # Fallback: if we couldn't determine order, just say not coming soon
-        return False
-
-    # Strategy:
-    # For every <ul> containing a <li> equal to "Billsburg Brewery",
-    # treat the nearest previous heading as the beer name, and the other <li>s
-    # in that <ul> as stats (style, ABV, IBU, etc).
+    # For each <ul> that lists Billsburg beers
     for ul in soup.find_all("ul"):
         lis = ul.find_all("li")
         if not lis:
             continue
 
-        has_brewery = any(
-            li.get_text(strip=True) == BREWERY_NAME for li in lis
-        )
-        if not has_brewery:
+        if not any(li.get_text(strip=True) == BREWERY_NAME for li in lis):
             continue
 
-        # Find the beer's heading just before this <ul>
-        heading = ul.find_previous(["h1", "h2", "h3", "h4", "h5", "h6"])
-        if not heading:
-            continue
+        # --- Find beer name from previous siblings ---
+        name_tag: Tag | None = None
+        for sib in ul.previous_siblings:
+            if not isinstance(sib, Tag):
+                continue
+            text = sib.get_text(strip=True)
+            if not text:
+                continue
+            # Ignore global headings / boilerplate
+            if text == BREWERY_NAME:
+                continue
+            if "Billsburg Brewery - Current Menu" in text:
+                continue
+            if "Coming Soon" in text:
+                continue
+            name_tag = sib
+            break
 
-        beer_name = heading.get_text(strip=True)
-        abv = None
-        ibu = None
-        style = None
+        if name_tag is None:
+            # Fallback: previous heading
+            name_tag = ul.find_previous(["h1", "h2", "h3", "h4", "h5", "h6"])
+            if name_tag is None:
+                continue
 
-        # We only want lines AFTER the "Billsburg Brewery" li
+        beer_name = name_tag.get_text(strip=True)
+
+        # --- Parse stats from <li>s AFTER the 'Billsburg Brewery' line ---
+        abv: float | None = None
+        ibu: int | None = None
+        style: str | None = None
+
         passed_brewery = False
         for li in lis:
             text = li.get_text(strip=True)
+            upper = text.upper()
 
             if text == BREWERY_NAME:
                 passed_brewery = True
@@ -112,33 +114,28 @@ def parse_billsburg_page(html: str):
             if not passed_brewery:
                 continue
 
-            upper = text.upper()
-
-            # ABV line
             if "ABV" in upper:
                 m = re.search(r"(\d+(?:\.\d+)?)", text)
                 if m:
                     abv = float(m.group(1))
                 continue
 
-            # IBU line
             if "IBU" in upper:
                 m = re.search(r"(\d+)", text)
                 if m:
                     ibu = int(m.group(1))
                 continue
 
-            # Potential style line (ignore SRM)
-            if "SRM" not in upper and style is None:
+            if "SRM" in upper:
+                # color only; ignore for now
+                continue
+
+            # Anything else after brewery/ABV/IBU we treat as style (e.g. "Schwarzbier")
+            if style is None:
                 style = text
 
-        # Decide tap group/category
-        if coming_soon_tag is not None and heading.sourceline and coming_soon_tag.sourceline:
-            coming = heading.sourceline > coming_soon_tag.sourceline
-        else:
-            # Fallback: simple heuristic based on text
-            coming = "coming soon" in beer_name.lower()
-
+        # --- Decide tap group / category ---
+        coming = ul_is_coming_soon(ul)
         tap_group = "Coming Soon" if coming else "On Tap"
         category = "coming_soon" if coming else "on_tap"
 
@@ -162,7 +159,7 @@ def parse_billsburg_page(html: str):
         )
 
     print("Parsed", len(beers), "Billsburg beers")
-    for b in beers[:8]:
+    for b in beers[:10]:
         print("DEBUG Billsburg:", b.name, "ABV=", b.abv, "IBU=", b.ibu, "Style=", b.style)
 
     return beers
