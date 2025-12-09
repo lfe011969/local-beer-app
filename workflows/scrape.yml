@@ -2,11 +2,11 @@ name: Scrape Breweries
 
 on:
   schedule:
-    - cron: "0 */12 * * *"   # Run every 12 hours
-  workflow_dispatch:         # Allow manual runs from the Actions tab
+    - cron: "0 */12 * * *"   # every 12 hours
+  workflow_dispatch:         # manual trigger
 
 permissions:
-  contents: write            # allow this workflow to push commits
+  contents: write
 
 jobs:
   scrape:
@@ -25,6 +25,8 @@ jobs:
         run: |
           pip install requests beautifulsoup4
 
+      # --- RUN SCRAPERS ---
+
       - name: Run 1700 scraper
         run: |
           python scrapers/scrape_1700.py
@@ -33,41 +35,42 @@ jobs:
         run: |
           python scrapers/scrape_billsburg.py
 
-
-      - name: List files after scraper
-        run: |
-          echo "DEBUG: files in workspace after scraper:"
-          ls -la
+      # --- MERGE OUTPUTS INTO beers.json ---
 
       - name: Merge brewery JSON files into beers.json
-  run: |
-    python - << 'EOF'
-    import json, pathlib
+        run: |
+          python - << 'EOF'
+          import json, pathlib
 
-    root = pathlib.Path(".")
-    files = [
-        root / "beers_1700.json",
-        root / "beers_billsburg.json",
-    ]
+          root = pathlib.Path(".")
 
-    all_beers = []
-    for path in files:
-        if path.exists():
-            with path.open("r", encoding="utf-8") as f:
-                try:
-                    data = json.load(f)
-                    if isinstance(data, list):
-                        all_beers.extend(data)
-                except json.JSONDecodeError:
-                    print(f"WARNING: could not parse {path}, skipping")
+          input_files = [
+              root / "beers_1700.json",
+              root / "beers_billsburg.json",
+          ]
 
-    with open("beers.json", "w", encoding="utf-8") as out:
-        json.dump(all_beers, out, indent=2, ensure_ascii=False)
+          all_beers = []
+          for path in input_files:
+              if path.exists():
+                  print(f"Loading {path}...")
+                  with path.open("r", encoding="utf-8") as f:
+                      try:
+                          data = json.load(f)
+                          if isinstance(data, list):
+                              all_beers.extend(data)
+                              print(f"  -> {len(data)} beers")
+                          else:
+                              print(f"  WARNING: {path} did not contain a list, skipping")
+                      except json.JSONDecodeError as e:
+                          print(f"  WARNING: could not parse {path}: {e}")
 
-    print(f"Wrote {len(all_beers)} beers to beers.json")
-    EOF
+          with open("beers.json", "w", encoding="utf-8") as out:
+              json.dump(all_beers, out, indent=2, ensure_ascii=False)
 
+          print(f"Wrote {len(all_beers)} beers to beers.json")
+          EOF
 
+      # --- COMMIT & PUSH ---
 
       - name: Commit and push updated beers.json
         env:
@@ -76,14 +79,6 @@ jobs:
           git config user.name "Local Beer App Bot"
           git config user.email "bot@example.com"
 
-          # show status for debugging
-          git status
-
-          # stage file
           git add beers.json
-
-          # commit if there are changes; otherwise do nothing
           git commit -m "Update beers.json from scraper" || echo "No changes to commit"
-
-          # push using the token-based remote set up by actions/checkout
           git push
