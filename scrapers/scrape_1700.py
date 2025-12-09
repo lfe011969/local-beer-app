@@ -4,9 +4,9 @@ from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 
 import requests
-from bs4 import BeautifulSoup, NavigableString, Tag
+from bs4 import BeautifulSoup, NavigableString
 
-DRINK_MENU_URL = "https://business.untappd.com/app/boards/55817?page=1"
+DRINK_MENU_URL = "https://1700brewing.beer/newport-news-1700-brewing-drink-menu"
 
 BREWERY_NAME = "1700 Brewing"
 BREWERY_CITY = "Newport News"
@@ -23,7 +23,7 @@ class BeerRecord:
     abv: float | None
     ibu: int | None
     tapGroup: str
-    category: str
+    category: str          # "on_tap" or "guest_na"
     sourceUrl: str
     lastScraped: str
 
@@ -44,7 +44,7 @@ def fetch_html(url: str) -> str:
             "Chrome/120.0 Safari/537.36"
         )
     }
-    resp = requests.get(url, headers=headers, timeout=15)
+    resp = requests.get(url, headers=headers, timeout=20)
     resp.raise_for_status()
     return resp.text
 
@@ -94,8 +94,8 @@ def parse_1700_page(html: str):
     beers = []
     now = datetime.now(timezone.utc).isoformat()
 
-    headings = soup.find_all(["h4", "h5", "h6"])
-    print("DEBUG: found", len(headings), "<h4>/<h5>/<h6> headings")
+    headings = soup.find_all(["h2", "h3"])
+    print("DEBUG: found", len(headings), "<h2>/<h3> headings")
     for h in headings[:10]:
         print("DEBUG heading:", h.name, "-", h.get_text(" ", strip=True)[:80])
 
@@ -103,70 +103,66 @@ def parse_1700_page(html: str):
     current_category = "on_tap"
 
     for node in headings:
-    text = node.get_text(" ", strip=True)
+        text = node.get_text(" ", strip=True)
 
-    # ---- TAP GROUP HEADERS (Untappd <h4>) ----
-    if node.name == "h4":
-        if (
-            "Taps" in text
-            or "Spec Ops" in text
-            or "Odd Stuff" in text
-            or "Reserves" in text
-            or "On Deck" in text
-        ):
-            current_group = text
-            current_category = "guest_na" if "Reserves" in text else "on_tap"
-        else:
-            continue
+        # tap group headings
+        if node.name == "h2":
+            if (
+                "Taps -" in text
+                or "Spec Ops" in text
+                or "Odd Stuff" in text
+                or "Reserves -" in text
+            ):
+                current_group = text
+                current_category = "guest_na" if "Reserves" in text else "on_tap"
+            else:
+                continue
 
-    # ---- BEER ENTRIES (Untappd <h5>) ----
-    elif node.name == "h5":
-        if not current_group:
-            continue
+        # beer entries
+        elif node.name == "h3":
+            if not current_group:
+                continue
 
-        beer_name, style_from_header = parse_header(text)
+            beer_name, style_from_header = parse_header(text)
 
-        # Look for the <h6> after <h5> that contains ABV/IBU
-        stats_node = node.find_next(
-            string=lambda t: isinstance(t, NavigableString)
-            and "ABV" in t
-            and "IBU" in t
-        )
-        if not stats_node:
-            continue
-
-        stats_line = stats_node.strip()
-        abv, ibu, style_from_line, producer = parse_stats_line(stats_line)
-        style = style_from_header or style_from_line
-        if not producer:
-            producer = BREWERY_NAME
-
-        beer_id = slugify(f"{BREWERY_NAME}-{beer_name}")
-
-        beers.append(
-            BeerRecord(
-                id=beer_id,
-                breweryName=BREWERY_NAME,
-                breweryCity=BREWERY_CITY,
-                producerName=producer,
-                name=beer_name,
-                style=style,
-                abv=abv,
-                ibu=ibu,
-                tapGroup=current_group,
-                category=current_category,
-                sourceUrl=DRINK_MENU_URL,
-                lastScraped=now,
+            stats_node = node.find_next(
+                string=lambda t: isinstance(t, NavigableString)
+                and "ABV" in t
+                and "IBU" in t
             )
-        )
+            if not stats_node:
+                continue
 
+            stats_line = stats_node.strip()
+            abv, ibu, style_from_line, producer = parse_stats_line(stats_line)
+            style = style_from_header or style_from_line
+            if not producer:
+                producer = BREWERY_NAME
 
+            beer_id = slugify(f"{BREWERY_NAME}-{beer_name}")
+
+            beers.append(
+                BeerRecord(
+                    id=beer_id,
+                    breweryName=BREWERY_NAME,
+                    breweryCity=BREWERY_CITY,
+                    producerName=producer,
+                    name=beer_name,
+                    style=style,
+                    abv=abv,
+                    ibu=ibu,
+                    tapGroup=current_group,
+                    category=current_category,
+                    sourceUrl=DRINK_MENU_URL,
+                    lastScraped=now,
+                )
+            )
 
     print("Parsed", len(beers), "beers from 1700")
     return beers
 
 
-def scrape_1700_to_json(out="beers_1700.json"):
+def scrape_1700_to_json(out: str = "beers_1700.json"):
     print("DEBUG: starting scrape_1700_to_json, output:", out)
     html = fetch_html(DRINK_MENU_URL)
     beers = parse_1700_page(html)
