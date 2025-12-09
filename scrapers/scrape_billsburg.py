@@ -52,22 +52,24 @@ def fetch_html(url: str) -> str:
 
 def parse_stats_from_line(line: str):
     """
-    Extract ABV / IBU / SRM (if present) from a line like:
-    'ABV 5.3%', 'IBU 15', 'SRM 2'
+    Extract ABV / IBU from a line like:
+      'ABV 5.3%'
+      'IBU 15'
+      'ABV 5.3% IBU 15'
     """
     abv = None
     ibu = None
-    # SRM isn't used in your UI yet but we could keep it if you like
 
-    if "ABV" in line:
-        m = re.search(r"(\d+(?:\.\d+)?)\s*%?", line)
-        if m:
-            abv = float(m.group(1))
+    # ABV: look for something like '5.3%' or '5.3 %'
+    m_abv = re.search(r"(\d+(?:\.\d+)?)\s*%?", line, re.IGNORECASE)
+    if "ABV" in line.upper() and m_abv:
+        abv = float(m_abv.group(1))
 
-    if "IBU" in line:
-        m = re.search(r"(\d+)", line)
-        if m:
-            ibu = int(m.group(1))
+    # IBU: look for '15 IBU' or 'IBU 15'
+    m_ibu = re.search(r"(\d+)\s*IBU|IBU\s*(\d+)", line, re.IGNORECASE)
+    if "IBU" in line.upper() and m_ibu:
+        num = m_ibu.group(1) or m_ibu.group(2)
+        ibu = int(num)
 
     return abv, ibu
 
@@ -84,51 +86,52 @@ def parse_billsburg_page(html: str):
     current_category = "on_tap"
 
     # When we hit "Coming Soon", everything after that becomes coming_soon
-    for i, line in enumerate(lines):
+    for idx, line in enumerate(lines):
         if line.startswith("Coming Soon"):
             current_group = "Coming Soon"
             current_category = "coming_soon"
+            # We don't break; we only use this later when building records
+            break
 
-    # Simple pass: look for patterns of:
-    #   <Beer Name>
-    #   Billsburg Brewery
-    #   [optional lines with ABV / IBU / SRM]
     i = 0
     while i < len(lines) - 1:
         name_line = lines[i]
         next_line = lines[i + 1]
 
+        # Heuristics to detect a beer block:
         if (
             next_line == BREWERY_NAME
             and "Last Updated:" not in name_line
-            and not name_line.startswith("#")
             and "Taplist.io" not in name_line
-            and "Billsburg Brewery" not in name_line
             and "Powered by" not in name_line
-            and "Beers On Tap" not in name_line
+            and not name_line.startswith("#")
         ):
             beer_name = name_line
             producer_name = BREWERY_NAME
             abv = None
             ibu = None
-            style = None  # Taplist.io doesn't expose style in this view
+            style = None  # Taplist doesn't expose style here as plain text
 
-            # Look ahead a few lines for ABV/IBU
+            # Look forward a few lines for ABV/IBU
             j = i + 2
-            while j < len(lines) and j <= i + 6:
+            while j < len(lines) and j <= i + 8:
                 line_j = lines[j]
-                if "ABV" in line_j or "IBU" in line_j:
-                    abv_j, ibu_j = parse_stats_from_line(line_j)
-                    if abv_j is not None:
-                        abv = abv_j
-                    if ibu_j is not None:
-                        ibu = ibu_j
-                # Stop if we hit another beer name pattern
+
+                # Stop if we hit the next beer (name followed by brewery)
                 if (
                     j + 1 < len(lines)
                     and lines[j + 1] == BREWERY_NAME
                 ):
                     break
+
+                # Detect ABV / IBU lines
+                if "ABV" in line_j.upper() or "IBU" in line_j.upper():
+                    abv_j, ibu_j = parse_stats_from_line(line_j)
+                    if abv_j is not None:
+                        abv = abv_j
+                    if ibu_j is not None:
+                        ibu = ibu_j
+
                 j += 1
 
             beer_id = slugify(f"{BREWERY_NAME}-{beer_name}")
@@ -156,6 +159,10 @@ def parse_billsburg_page(html: str):
             i += 1
 
     print("Parsed", len(beers), "Billsburg beers")
+    # For debugging, show a few with stats
+    for b in beers[:5]:
+        print("DEBUG Billsburg:", b.name, "ABV=", b.abv, "IBU=", b.ibu)
+
     return beers
 
 
