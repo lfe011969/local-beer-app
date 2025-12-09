@@ -4,9 +4,8 @@ from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
-# Public current menu for Billsburg on Taplist.io
 TAPLIST_URL = "https://taplist.io/taplist-739667"
 
 BREWERY_NAME = "Billsburg Brewery"
@@ -23,8 +22,8 @@ class BeerRecord:
     style: str | None
     abv: float | None
     ibu: int | None
-    tapGroup: str          # "On Tap" or "Coming Soon"
-    category: str          # "on_tap" or "coming_soon"
+    tapGroup: str          # e.g. "On Tap", "Coming Soon"
+    category: str          # e.g. "on_tap", "coming_soon"
     sourceUrl: str
     lastScraped: str
 
@@ -50,118 +49,121 @@ def fetch_html(url: str) -> str:
     return resp.text
 
 
-def parse_stats_from_line(line: str):
-    """
-    Extract ABV / IBU from a line like:
-      'ABV 5.3%'
-      'IBU 15'
-      'ABV 5.3% IBU 15'
-    """
-    abv = None
-    ibu = None
-
-    # ABV: look for something like '5.3%' or '5.3 %'
-    m_abv = re.search(r"(\d+(?:\.\d+)?)\s*%?", line, re.IGNORECASE)
-    if "ABV" in line.upper() and m_abv:
-        abv = float(m_abv.group(1))
-
-    # IBU: look for '15 IBU' or 'IBU 15'
-    m_ibu = re.search(r"(\d+)\s*IBU|IBU\s*(\d+)", line, re.IGNORECASE)
-    if "IBU" in line.upper() and m_ibu:
-        num = m_ibu.group(1) or m_ibu.group(2)
-        ibu = int(num)
-
-    return abv, ibu
-
-
 def parse_billsburg_page(html: str):
     soup = BeautifulSoup(html, "html.parser")
-    text = soup.get_text("\n", strip=True)
-    lines = [l.strip() for l in text.splitlines() if l.strip()]
-
     beers: list[BeerRecord] = []
     now = datetime.now(timezone.utc).isoformat()
 
-    current_group = "On Tap"
-    current_category = "on_tap"
-
-    # When we hit "Coming Soon", everything after that becomes coming_soon
-    for idx, line in enumerate(lines):
-        if line.startswith("Coming Soon"):
-            current_group = "Coming Soon"
-            current_category = "coming_soon"
-            # We don't break; we only use this later when building records
+    # Find the node that marks the "Coming Soon" section so we can distinguish groups
+    coming_soon_tag = None
+    for h in soup.find_all(["h2", "h3", "h4"]):
+        if "coming soon" in h.get_text(strip=True).lower():
+            coming_soon_tag = h
             break
 
-    i = 0
-    while i < len(lines) - 1:
-        name_line = lines[i]
-        next_line = lines[i + 1]
+    def is_coming_soon(heading: Tag) -> bool:
+        # If we never found a Coming Soon header, treat everything as on tap
+        if coming_soon_tag is None:
+            return False
+        # heading comes after coming_soon_tag in document order?
+        for elem in soup.descendants:
+            if elem is coming_soon_tag:
+                # from this point on, anything we see is "coming soon"
+                seen_marker = True
+            if elem is heading:
+                # if we hit heading before marker, it's not coming soon
+                return False
+        # Fallback: if we couldn't determine order, just say not coming soon
+        return False
 
-        # Heuristics to detect a beer block:
-        if (
-            next_line == BREWERY_NAME
-            and "Last Updated:" not in name_line
-            and "Taplist.io" not in name_line
-            and "Powered by" not in name_line
-            and not name_line.startswith("#")
-        ):
-            beer_name = name_line
-            producer_name = BREWERY_NAME
-            abv = None
-            ibu = None
-            style = None  # Taplist doesn't expose style here as plain text
+    # Strategy:
+    # For every <ul> containing a <li> equal to "Billsburg Brewery",
+    # treat the nearest previous heading as the beer name, and the other <li>s
+    # in that <ul> as stats (style, ABV, IBU, etc).
+    for ul in soup.find_all("ul"):
+        lis = ul.find_all("li")
+        if not lis:
+            continue
 
-            # Look forward a few lines for ABV/IBU
-            j = i + 2
-            while j < len(lines) and j <= i + 8:
-                line_j = lines[j]
+        has_brewery = any(
+            li.get_text(strip=True) == BREWERY_NAME for li in lis
+        )
+        if not has_brewery:
+            continue
 
-                # Stop if we hit the next beer (name followed by brewery)
-                if (
-                    j + 1 < len(lines)
-                    and lines[j + 1] == BREWERY_NAME
-                ):
-                    break
+        # Find the beer's heading just before this <ul>
+        heading = ul.find_previous(["h1", "h2", "h3", "h4", "h5", "h6"])
+        if not heading:
+            continue
 
-                # Detect ABV / IBU lines
-                if "ABV" in line_j.upper() or "IBU" in line_j.upper():
-                    abv_j, ibu_j = parse_stats_from_line(line_j)
-                    if abv_j is not None:
-                        abv = abv_j
-                    if ibu_j is not None:
-                        ibu = ibu_j
+        beer_name = heading.get_text(strip=True)
+        abv = None
+        ibu = None
+        style = None
 
-                j += 1
+        # We only want lines AFTER the "Billsburg Brewery" li
+        passed_brewery = False
+        for li in lis:
+            text = li.get_text(strip=True)
 
-            beer_id = slugify(f"{BREWERY_NAME}-{beer_name}")
+            if text == BREWERY_NAME:
+                passed_brewery = True
+                continue
+            if not passed_brewery:
+                continue
 
-            beers.append(
-                BeerRecord(
-                    id=beer_id,
-                    breweryName=BREWERY_NAME,
-                    breweryCity=BREWERY_CITY,
-                    producerName=producer_name,
-                    name=beer_name,
-                    style=style,
-                    abv=abv,
-                    ibu=ibu,
-                    tapGroup=current_group,
-                    category=current_category,
-                    sourceUrl=TAPLIST_URL,
-                    lastScraped=now,
-                )
-            )
+            upper = text.upper()
 
-            # Jump forward to continue after this beer block
-            i = j
+            # ABV line
+            if "ABV" in upper:
+                m = re.search(r"(\d+(?:\.\d+)?)", text)
+                if m:
+                    abv = float(m.group(1))
+                continue
+
+            # IBU line
+            if "IBU" in upper:
+                m = re.search(r"(\d+)", text)
+                if m:
+                    ibu = int(m.group(1))
+                continue
+
+            # Potential style line (ignore SRM)
+            if "SRM" not in upper and style is None:
+                style = text
+
+        # Decide tap group/category
+        if coming_soon_tag is not None and heading.sourceline and coming_soon_tag.sourceline:
+            coming = heading.sourceline > coming_soon_tag.sourceline
         else:
-            i += 1
+            # Fallback: simple heuristic based on text
+            coming = "coming soon" in beer_name.lower()
+
+        tap_group = "Coming Soon" if coming else "On Tap"
+        category = "coming_soon" if coming else "on_tap"
+
+        beer_id = slugify(f"{BREWERY_NAME}-{beer_name}")
+
+        beers.append(
+            BeerRecord(
+                id=beer_id,
+                breweryName=BREWERY_NAME,
+                breweryCity=BREWERY_CITY,
+                producerName=BREWERY_NAME,
+                name=beer_name,
+                style=style,
+                abv=abv,
+                ibu=ibu,
+                tapGroup=tap_group,
+                category=category,
+                sourceUrl=TAPLIST_URL,
+                lastScraped=now,
+            )
+        )
 
     print("Parsed", len(beers), "Billsburg beers")
-    # For debugging, show a few with stats
-    for b in beers[:5]:
-        print("DEBUG Billsburg:", b.name, "ABV=", b.abv, "IBU=", b.ibu)
+    for b in beers[:8]:
+        print("DEBUG Billsburg:", b.name, "ABV=", b.abv, "IBU=", b.ibu, "Style=", b.style)
 
     return beers
 
