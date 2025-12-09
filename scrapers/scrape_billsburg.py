@@ -22,7 +22,7 @@ class BeerRecord:
     style: str | None
     abv: float | None
     ibu: int | None
-    tapGroup: str          # e.g. "On Tap", "Coming Soon"
+    tapGroup: str          # "On Tap" or "Coming Soon"
     category: str          # "on_tap" or "coming_soon"
     sourceUrl: str
     lastScraped: str
@@ -54,92 +54,65 @@ def parse_billsburg_page(html: str):
     beers: list[BeerRecord] = []
     now = datetime.now(timezone.utc).isoformat()
 
-    # We'll treat an <h2>/<h3>/<h4> containing "Coming Soon" as the divider
     def ul_is_coming_soon(ul: Tag) -> bool:
+        """Look for the nearest previous heading that says 'Coming Soon'."""
         heading = ul.find_previous(
             lambda tag: isinstance(tag, Tag)
-            and tag.name in ["h2", "h3", "h4"]
-            and "coming soon" in tag.get_text(strip=True).lower()
+            and tag.name in ["h1", "h2", "h3", "h4"]
         )
-        return heading is not None
+        if not heading:
+            return False
+        return "coming soon" in heading.get_text(strip=True).lower()
 
-    # For each <ul> that lists Billsburg beers
     for ul in soup.find_all("ul"):
         lis = ul.find_all("li")
         if not lis:
             continue
 
-        if not any(li.get_text(strip=True) == BREWERY_NAME for li in lis):
+        texts = [li.get_text(strip=True) for li in lis]
+
+        # must contain the brewery line to be a beer entry
+        if BREWERY_NAME not in texts:
             continue
 
-        # --- Find beer name from previous siblings ---
-        name_tag: Tag | None = None
-        for sib in ul.previous_siblings:
-            if not isinstance(sib, Tag):
-                continue
-            text = sib.get_text(strip=True)
-            if not text:
-                continue
-            # Ignore global headings / boilerplate
-            if text == BREWERY_NAME:
-                continue
-            if "Billsburg Brewery - Current Menu" in text:
-                continue
-            if "Coming Soon" in text:
-                continue
-            name_tag = sib
-            break
+        idx_brew = texts.index(BREWERY_NAME)
+        if idx_brew == 0:
+            # there's no line before the brewery, so we don't know the name
+            continue
 
-        if name_tag is None:
-            # Fallback: previous heading
-            name_tag = ul.find_previous(["h1", "h2", "h3", "h4", "h5", "h6"])
-            if name_tag is None:
-                continue
+        # Beer name is the <li> immediately before "Billsburg Brewery"
+        raw_name = texts[idx_brew - 1]
 
-        beer_name = name_tag.get_text(strip=True)
+        # Try to split out style if it is embedded, e.g. "Invisible Light (Schwarzbier)"
+        style = None
+        name = raw_name
+        m = re.match(r"(.+?)\s*\((.+)\)", raw_name)
+        if m:
+            name = m.group(1).strip()
+            style = m.group(2).strip()
 
-        # --- Parse stats from <li>s AFTER the 'Billsburg Brewery' line ---
         abv: float | None = None
         ibu: int | None = None
-        style: str | None = None
 
-        passed_brewery = False
-        for li in lis:
-            text = li.get_text(strip=True)
+        # Look at lines after the brewery for ABV / IBU
+        for text in texts[idx_brew + 1 :]:
             upper = text.upper()
 
-            if text == BREWERY_NAME:
-                passed_brewery = True
-                continue
-            if not passed_brewery:
-                continue
-
             if "ABV" in upper:
-                m = re.search(r"(\d+(?:\.\d+)?)", text)
-                if m:
-                    abv = float(m.group(1))
-                continue
+                m_abv = re.search(r"(\d+(?:\.\d+)?)", text)
+                if m_abv:
+                    abv = float(m_abv.group(1))
 
             if "IBU" in upper:
-                m = re.search(r"(\d+)", text)
-                if m:
-                    ibu = int(m.group(1))
-                continue
+                m_ibu = re.search(r"(\d+)", text)
+                if m_ibu:
+                    ibu = int(m_ibu.group(1))
 
-            if "SRM" in upper:
-                # color only; ignore for now
-                continue
-
-            # Anything else after brewery/ABV/IBU we treat as style (e.g. "Schwarzbier")
-            if style is None:
-                style = text
-
-        # --- Decide tap group / category ---
         coming = ul_is_coming_soon(ul)
         tap_group = "Coming Soon" if coming else "On Tap"
         category = "coming_soon" if coming else "on_tap"
 
-        beer_id = slugify(f"{BREWERY_NAME}-{beer_name}")
+        beer_id = slugify(f"{BREWERY_NAME}-{name}")
 
         beers.append(
             BeerRecord(
@@ -147,7 +120,7 @@ def parse_billsburg_page(html: str):
                 breweryName=BREWERY_NAME,
                 breweryCity=BREWERY_CITY,
                 producerName=BREWERY_NAME,
-                name=beer_name,
+                name=name,
                 style=style,
                 abv=abv,
                 ibu=ibu,
@@ -160,7 +133,7 @@ def parse_billsburg_page(html: str):
 
     print("Parsed", len(beers), "Billsburg beers")
     for b in beers[:10]:
-        print("DEBUG Billsburg:", b.name, "ABV=", b.abv, "IBU=", b.ibu, "Style=", b.style)
+        print("DEBUG Billsburg:", repr(b.name), "ABV=", b.abv, "IBU=", b.ibu, "Style=", b.style)
 
     return beers
 
