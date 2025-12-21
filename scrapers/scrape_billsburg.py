@@ -54,9 +54,15 @@ def parse_abv(line: str) -> float | None:
     Accept:
       - "ABV 5.3%"
       - "5.3% ABV"
-      - "5.3%ABV"
+      - "5.3%"
     """
-    low = line.lower()
+    low = line.lower().strip()
+
+    # If it's just something like "5.3%" treat as ABV
+    m_pct_only = re.fullmatch(r"(\d+(?:\.\d+)?)\s*%", low)
+    if m_pct_only:
+        return float(m_pct_only.group(1))
+
     if "abv" not in low:
         return None
 
@@ -68,13 +74,24 @@ def parse_abv(line: str) -> float | None:
     return float(num) if num else None
 
 
+
 def parse_ibu(line: str) -> int | None:
     """
     Accept:
       - "IBU 15"
       - "15 IBU"
+      - "15"  (numeric-only line, typical for taplist)
     """
-    low = line.lower()
+    low = line.lower().strip()
+
+    # Numeric-only line: treat as IBU if in a sane range
+    m_num_only = re.fullmatch(r"(\d{1,3})", low)
+    if m_num_only:
+        val = int(m_num_only.group(1))
+        if 1 <= val <= 150:
+            return val
+        return None
+
     if "ibu" not in low:
         return None
 
@@ -84,6 +101,7 @@ def parse_ibu(line: str) -> int | None:
 
     num = m.group(1) or m.group(2)
     return int(num) if num else None
+
 
 
 def parse_billsburg_page(html: str):
@@ -162,17 +180,28 @@ def parse_billsburg_page(html: str):
             val_abv = parse_abv(nxt)
             if val_abv is not None:
                 abv = val_abv
+                k += 1
+                continue
 
             val_ibu = parse_ibu(nxt)
             if val_ibu is not None:
                 ibu = val_ibu
+                k += 1
+                continue
+
 
             # Style: must not be ABV/IBU/SRM and must not contain '%'
             upper = nxt.upper()
             if style is None:
                 if ("ABV" not in upper) and ("IBU" not in upper) and ("SRM" not in upper):
-                    if "%" not in nxt and 2 <= len(nxt) <= 40:
+                    # Don't treat % lines or pure numbers as style
+                    if "%" in nxt:
+                        pass
+                    elif re.fullmatch(r"\d{1,3}", nxt.strip()):
+                        pass
+                    elif 2 <= len(nxt) <= 40:
                         style = nxt
+
 
             k += 1
 
