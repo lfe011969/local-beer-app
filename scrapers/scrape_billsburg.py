@@ -4,7 +4,7 @@ from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 
 import requests
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup
 
 TAPLIST_URL = "https://taplist.io/taplist-739667"
 
@@ -22,8 +22,8 @@ class BeerRecord:
     style: str | None
     abv: float | None
     ibu: int | None
-    tapGroup: str
-    category: str
+    tapGroup: str          # "On Tap" or "Coming Soon"
+    category: str          # "on_tap" or "coming_soon"
     sourceUrl: str
     lastScraped: str
 
@@ -52,105 +52,144 @@ def fetch_html(url: str) -> str:
 def parse_billsburg_page(html: str):
     soup = BeautifulSoup(html, "html.parser")
     now = datetime.now(timezone.utc).isoformat()
-    beers: list[BeerRecord] = []
 
+    # Turn the page into clean lines, similar to what you see in the browser
+    text = soup.get_text("\n", strip=True)
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+
+    # Debug: confirm we got meaningful content
     title = soup.title.get_text(strip=True) if soup.title else "(no title)"
     print("DEBUG: page title:", title)
-    print("DEBUG: html contains 'Billsburg':", "billsburg" in html.lower())
+    print("DEBUG: total lines:", len(lines))
 
-    def ul_is_coming_soon(ul: Tag) -> bool:
-        heading = ul.find_previous(lambda t: isinstance(t, Tag) and t.name in ["h1", "h2", "h3", "h4"])
-        if not heading:
-            return False
-        return "coming soon" in heading.get_text(strip=True).lower()
+    beers: list[BeerRecord] = []
 
-    # Robust match: producer line might be "Billsburg Brewery " or "Billsburg Brewery •"
-    def is_billsburg_line(text: str) -> bool:
-        t = text.strip().lower()
-        return "billsburg" in t and "brew" in t  # catches "Billsburg Brewery", "Billsburg Brewing", etc.
+    current_group = "On Tap"
+    current_category = "on_tap"
 
-    for ul in soup.find_all("ul"):
-        lis = ul.find_all("li")
-        if not lis:
+    # Helpers
+    def is_brewery_line(line: str) -> bool:
+        return line.strip().lower() == BREWERY_NAME.lower()
+
+    def is_noise(line: str) -> bool:
+        low = line.lower()
+        return (
+            low.startswith("last updated:")
+            or "powered by taplist" in low
+            or "taplist.io" == low
+            or low.endswith("—instant digital menus for bars and breweries.")
+            or low.endswith("instant digital menus for bars and breweries.")
+        )
+
+    def parse_abv(line: str) -> float | None:
+        if "abv" not in line.lower():
+            return None
+        m = re.search(r"(\d+(?:\.\d+)?)", line)
+        return float(m.group(1)) if m else None
+
+    def parse_ibu(line: str) -> int | None:
+        if "ibu" not in line.lower():
+            return None
+        m = re.search(r"(\d+)", line)
+        return int(m.group(1)) if m else None
+
+    # Walk through lines and anchor on brewery lines
+    for i in range(len(lines)):
+        line = lines[i]
+
+        # Switch section when we hit Coming Soon header
+        if line.lower().startswith("coming soon"):
+            current_group = "Coming Soon"
+            current_category = "coming_soon"
             continue
 
-        texts = [li.get_text(" ", strip=True) for li in lis]
-        # Find the index of the producer line (approx)
-        idx_brew = None
-        for idx, t in enumerate(texts):
-            if is_billsburg_line(t):
-                idx_brew = idx
-                break
-
-        if idx_brew is None:
+        if not is_brewery_line(line):
             continue
 
-        # Beer name is typically the line immediately before producer
-        if idx_brew == 0:
+        # Beer name is the closest non-noise line above this "Billsburg Brewery" line
+        j = i - 1
+        beer_name = None
+        while j >= 0:
+            prev = lines[j]
+            if is_noise(prev):
+                j -= 1
+                continue
+            if prev.lower().startswith("coming soon"):
+                j -= 1
+                continue
+            # Avoid grabbing the page title/header as a beer name
+            if "current menu" in prev.lower():
+                j -= 1
+                continue
+            beer_name = prev
+            break
+
+        if not beer_name:
             continue
 
-        raw_name = texts[idx_brew - 1].strip()
-        if not raw_name or "try a flight" in raw_name.lower():
-            # Avoid grabbing the promo header as a "beer"
-            continue
-
-        # Optional style embedded in name: "Name (Style)"
+        # Now scan forward for style/ABV/IBU until we hit the next beer block
         style = None
-        name = raw_name
-        m = re.match(r"(.+?)\s*\((.+)\)", raw_name)
-        if m:
-            name = m.group(1).strip()
-            style = m.group(2).strip()
-
         abv = None
         ibu = None
 
-        for t in texts[idx_brew + 1 :]:
-            upper = t.upper()
-            if "ABV" in upper:
-                m_abv = re.search(r"(\d+(?:\.\d+)?)", t)
-                if m_abv:
-                    abv = float(m_abv.group(1))
-            if "IBU" in upper:
-                m_ibu = re.search(r"(\d+)", t)
-                if m_ibu:
-                    ibu = int(m_ibu.group(1))
+        k = i + 1
+        while k < len(lines):
+            nxt = lines[k]
 
-            # If Taplist has a plain style line after producer and before ABV, capture it
-            if style is None and ("ABV" not in upper) and ("IBU" not in upper) and ("SRM" not in upper):
-                # only accept short-ish tokens (avoid grabbing huge descriptions)
-                if 2 <= len(t) <= 40:
-                    style = t
+            # Stop when we reach the next beer name (which is followed by the brewery line)
+            if k + 1 < len(lines) and is_brewery_line(lines[k + 1]):
+                break
+            if nxt.lower().startswith("coming soon"):
+                break
+            if is_noise(nxt):
+                break
+            if nxt == BREWERY_NAME:
+                break
 
-        coming = ul_is_coming_soon(ul)
-        tap_group = "Coming Soon" if coming else "On Tap"
-        category = "coming_soon" if coming else "on_tap"
+            # Extract ABV/IBU
+            val_abv = parse_abv(nxt)
+            if val_abv is not None:
+                abv = val_abv
+
+            val_ibu = parse_ibu(nxt)
+            if val_ibu is not None:
+                ibu = val_ibu
+
+            # Style line is typically a single word/short phrase (e.g., "Schwarzbier")
+            upper = nxt.upper()
+            if (
+                style is None
+                and "ABV" not in upper
+                and "IBU" not in upper
+                and "SRM" not in upper
+                and len(nxt) <= 40
+            ):
+                style = nxt
+
+            k += 1
+
+        beer_id = slugify(f"{BREWERY_NAME}-{beer_name}")
 
         beers.append(
             BeerRecord(
-                id=slugify(f"{BREWERY_NAME}-{name}"),
+                id=beer_id,
                 breweryName=BREWERY_NAME,
                 breweryCity=BREWERY_CITY,
                 producerName=BREWERY_NAME,
-                name=name,
+                name=beer_name,
                 style=style,
                 abv=abv,
                 ibu=ibu,
-                tapGroup=tap_group,
-                category=category,
+                tapGroup=current_group,
+                category=current_category,
                 sourceUrl=TAPLIST_URL,
                 lastScraped=now,
             )
         )
 
     print("Parsed", len(beers), "Billsburg beers")
-    for b in beers[:8]:
-        print("DEBUG Billsburg:", b.name, "ABV=", b.abv, "IBU=", b.ibu, "Style=", b.style)
-
-    # If still zero, print a short excerpt so we can see what the runner received
-    if len(beers) == 0:
-        snippet = re.sub(r"\s+", " ", html)[:2000]
-        print("DEBUG: HTML snippet (first 2000 chars):", snippet)
+    for b in beers[:12]:
+        print("DEBUG Billsburg:", b.name, "ABV=", b.abv, "IBU=", b.ibu, "Style=", b.style, "Group=", b.tapGroup)
 
     return beers
 
