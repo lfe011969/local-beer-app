@@ -51,9 +51,9 @@ def fetch_html(url: str) -> str:
     return resp.text
 
 
-def parse_abv(text: str) -> float | None:
-    # Accept "5%", "5.9%", "5.9 %"
-    m = re.search(r"(\d+(?:\.\d+)?)\s*%", text.strip())
+def extract_abv(text: str) -> float | None:
+    # Finds first "6.5%" anywhere in a block
+    m = re.search(r"(\d+(?:\.\d+)?)\s*%", text)
     if not m:
         return None
     try:
@@ -62,56 +62,94 @@ def parse_abv(text: str) -> float | None:
         return None
 
 
-def clean_line(s: str) -> str:
-    s = s.strip()
-    s = re.sub(r"\s+", " ", s)
-    return s
+def normalize_space(s: str) -> str:
+    return re.sub(r"\s+", " ", s).strip()
 
 
 def looks_like_style(s: str) -> bool:
-    s2 = s.strip()
-    if not s2:
+    if not s:
         return False
-    low = s2.lower()
+    low = s.lower()
     if low in ICON_WORDS:
         return False
-    if s2 == "|":
+    if "%" in s:
         return False
-    if "%" in s2:
+    if s == "|":
         return False
-    # keep it sane length
-    return 2 <= len(s2) <= 40
+    # keep it sane for a style name
+    return 2 <= len(s) <= 45
 
 
-def collect_text_until_next_h2(h2: Tag) -> list[str]:
+def collect_block_text_until_next_h2(h2: Tag) -> str:
     """
-    Collect readable text lines following this beer's <h2> heading
-    until the next <h2> appears.
+    Walk forward in document order after this <h2> and collect meaningful text
+    until the next <h2> is encountered.
+    This handles nested WP containers that aren't direct siblings.
     """
-    lines: list[str] = []
-    for sib in h2.next_siblings:
-        if isinstance(sib, Tag) and sib.name == "h2":
-            break
+    parts: list[str] = []
 
-        # include text from tags; ignore empty
-        if isinstance(sib, Tag):
-            txt = sib.get_text("\n", strip=True)
-        else:
-            txt = str(sib).strip()
-
-        if not txt:
+    started = False
+    for el in h2.next_elements:
+        if not started:
+            started = True
             continue
 
-        for ln in txt.splitlines():
-            ln = clean_line(ln)
-            if not ln:
-                continue
-            # skip legend words if they appear in this block
-            if ln.lower() in ICON_WORDS:
-                continue
-            lines.append(ln)
+        if isinstance(el, Tag):
+            # Stop when we hit the next beer header
+            if el.name == "h2":
+                break
 
-    return lines
+            # Skip non-content
+            if el.name in {"script", "style", "noscript"}:
+                continue
+
+            # Grab text from common content tags
+            if el.name in {"p", "div", "span", "li"}:
+                txt = el.get_text(" ", strip=True)
+                txt = normalize_space(txt)
+                if not txt:
+                    continue
+
+                # Filter icon/legend noise if it appears
+                if txt.lower() in ICON_WORDS:
+                    continue
+
+                parts.append(txt)
+
+    # De-dupe while preserving order (WP layouts can repeat text)
+    seen = set()
+    deduped = []
+    for p in parts:
+        if p not in seen:
+            seen.add(p)
+            deduped.append(p)
+
+    return " \n ".join(deduped)
+
+
+def extract_style_from_block(block_text: str) -> str | None:
+    """
+    Tradition often formats as: "Hazy IPA | 6.5%"
+    If a '|' exists, style is typically left side of first pipe.
+    """
+    if not block_text:
+        return None
+
+    # Prefer "Style | ABV" pattern if present
+    if "|" in block_text:
+        left = block_text.split("|", 1)[0].strip()
+        left = normalize_space(left)
+        if looks_like_style(left):
+            return left
+
+    # Otherwise: find a short plausible style phrase from lines
+    for line in block_text.splitlines():
+        line = normalize_space(line)
+        # Avoid grabbing large marketing text; focus on shorter phrases
+        if looks_like_style(line) and len(line) <= 45:
+            return line
+
+    return None
 
 
 def parse_tradition(html: str) -> list[BeerRecord]:
@@ -121,64 +159,57 @@ def parse_tradition(html: str) -> list[BeerRecord]:
     title = soup.title.get_text(strip=True) if soup.title else "(no title)"
     print("DEBUG: page title:", title)
 
-    # Find the "What's On Tap" header <h2>
+    # Find section bounds
     start_h2 = None
-    for h2 in soup.find_all("h2"):
-        if h2.get_text(" ", strip=True).strip().lower() == "what's on tap":
-            start_h2 = h2
-            break
-
-    if not start_h2:
-        print("WARNING: Could not find 'What's On Tap' h2")
-        return []
-
-    # We stop at the "WEEKLY LINEUP" header
     end_h2 = None
+
     for h2 in soup.find_all("h2"):
-        if h2.get_text(" ", strip=True).strip().upper() == "WEEKLY LINEUP":
+        t = h2.get_text(" ", strip=True).strip()
+        if t.lower() == "what's on tap":
+            start_h2 = h2
+        if t.upper() == "WEEKLY LINEUP":
             end_h2 = h2
             break
 
-    # Collect all beer <h2> headings between start and end.
+    if not start_h2:
+        print("WARNING: Could not find 'What's On Tap'")
+        return []
+
+    # Collect beer h2s between start and end (beer headers are <h2><a>Beer</a></h2>)
     beer_h2s: list[Tag] = []
     in_section = False
+
     for h2 in soup.find_all("h2"):
-        txt = h2.get_text(" ", strip=True).strip()
         if h2 == start_h2:
             in_section = True
             continue
         if end_h2 and h2 == end_h2:
             break
-        if in_section:
-            # Beer headings on this page are h2 with an <a> inside (beer detail link)
-            a = h2.find("a")
-            if a and a.get_text(strip=True):
-                beer_h2s.append(h2)
+        if not in_section:
+            continue
+
+        a = h2.find("a")
+        if a and a.get_text(strip=True):
+            beer_h2s.append(h2)
 
     beers: list[BeerRecord] = []
 
+    print("DEBUG: found", len(beer_h2s), "candidate beer headings")
+
     for h2 in beer_h2s:
         a = h2.find("a")
-        name = a.get_text(strip=True) if a else h2.get_text(" ", strip=True)
+        name = a.get_text(strip=True) if a else h2.get_text(" ", strip=True).strip()
 
-        # Now parse following block for style/abv
-        lines = collect_text_until_next_h2(h2)
+        # Pull the associated block text for this beer
+        block = collect_block_text_until_next_h2(h2)
 
-        abv = None
-        style = None
+        # Remove obvious junk that can appear in blocks
+        block_clean = block
+        block_clean = block_clean.replace("What's On Tap", "")
+        block_clean = normalize_space(block_clean)
 
-        # ABV: first percent we see
-        for ln in lines:
-            val = parse_abv(ln)
-            if val is not None:
-                abv = val
-                break
-
-        # Style: first "style-like" line (often appears before "|")
-        for ln in lines:
-            if looks_like_style(ln):
-                style = ln
-                break
+        abv = extract_abv(block_clean)
+        style = extract_style_from_block(block_clean)
 
         beers.append(
             BeerRecord(
@@ -189,7 +220,7 @@ def parse_tradition(html: str) -> list[BeerRecord]:
                 name=name,
                 style=style,
                 abv=abv,
-                ibu=None,  # site doesn't consistently provide IBU here
+                ibu=None,  # not reliably provided on this page
                 tapGroup="On Tap",
                 category="on_tap",
                 sourceUrl=SOURCE_URL,
