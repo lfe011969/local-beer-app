@@ -59,9 +59,11 @@ def parse_abv(line: str) -> float | None:
     low = line.lower()
     if "abv" not in low:
         return None
+
     m = re.search(r"(\d+(?:\.\d+)?)\s*%?\s*abv|abv\s*(\d+(?:\.\d+)?)\s*%?", low)
     if not m:
         return None
+
     num = m.group(1) or m.group(2)
     return float(num) if num else None
 
@@ -75,9 +77,11 @@ def parse_ibu(line: str) -> int | None:
     low = line.lower()
     if "ibu" not in low:
         return None
+
     m = re.search(r"(\d+)\s*ibu|ibu\s*(\d+)", low)
     if not m:
         return None
+
     num = m.group(1) or m.group(2)
     return int(num) if num else None
 
@@ -144,7 +148,7 @@ def parse_billsburg_page(html: str):
         while k < len(lines):
             nxt = lines[k]
 
-            # stop if next beer is starting (line followed by brewery line)
+            # Stop if next beer starts (some line followed by brewery line)
             if k + 1 < len(lines) and is_brewery_line(lines[k + 1]):
                 break
             if nxt.lower().startswith("coming soon"):
@@ -163,7 +167,7 @@ def parse_billsburg_page(html: str):
             if val_ibu is not None:
                 ibu = val_ibu
 
-            # Style: must NOT be ABV/IBU/SRM and must NOT contain %
+            # Style: must not be ABV/IBU/SRM and must not contain '%'
             upper = nxt.upper()
             if style is None:
                 if ("ABV" not in upper) and ("IBU" not in upper) and ("SRM" not in upper):
@@ -178,4 +182,33 @@ def parse_billsburg_page(html: str):
                 breweryName=BREWERY_NAME,
                 breweryCity=BREWERY_CITY,
                 producerName=BREWERY_NAME,
-                name=beer
+                name=beer_name,
+                style=style,
+                abv=abv,
+                ibu=ibu,
+                tapGroup=current_group,
+                category=current_category,
+                sourceUrl=TAPLIST_URL,
+                lastScraped=now,
+            )
+        )
+
+    print("Parsed", len(beers), "Billsburg beers")
+    for b in beers[:12]:
+        print("DEBUG Billsburg:", b.name, "ABV=", b.abv, "IBU=", b.ibu, "Style=", b.style, "Group=", b.tapGroup)
+
+    return beers
+
+
+def scrape_billsburg_to_json(out: str = "beers_billsburg.json"):
+    print("DEBUG: starting scrape_billsburg_to_json, output:", out)
+    html = fetch_html(TAPLIST_URL)
+    beers = parse_billsburg_page(html)
+    print("DEBUG: about to write", len(beers), "Billsburg beers")
+    with open(out, "w", encoding="utf-8") as f:
+        json.dump([asdict(b) for b in beers], f, indent=2, ensure_ascii=False)
+    print("DEBUG: finished writing", out)
+
+
+if __name__ == "__main__":
+    scrape_billsburg_to_json()
