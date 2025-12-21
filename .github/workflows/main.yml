@@ -35,6 +35,10 @@ jobs:
         run: |
           python scrapers/scrape_billsburg.py
 
+      - name: Run Tradition scraper
+        run: |
+          python scrapers/scrape_billsburg.py
+
       # --- MERGE OUTPUTS INTO beers.json ---
 
       - name: Merge brewery JSON files into beers.json
@@ -47,6 +51,7 @@ jobs:
           input_files = [
               root / "beers_1700.json",
               root / "beers_billsburg.json",
+              root / "beers_tradition.json",
           ]
 
           all_beers = []
