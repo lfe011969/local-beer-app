@@ -37,7 +37,7 @@ jobs:
 
       - name: Run Tradition scraper
         run: |
-          python scrapers/scrape_billsburg.py
+          python scrapers/scrape_tradition.py
 
       # --- MERGE OUTPUTS INTO beers.json ---
 
