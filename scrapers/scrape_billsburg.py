@@ -50,57 +50,22 @@ def fetch_html(url: str) -> str:
 
 
 def parse_abv(line: str) -> float | None:
-    """
-    Accept:
-      - "ABV 5.3%"
-      - "5.3% ABV"
-      - "5.3%"
-    """
-    low = line.lower().strip()
-
-    # If it's just something like "5.3%" treat as ABV
-    m_pct_only = re.fullmatch(r"(\d+(?:\.\d+)?)\s*%", low)
-    if m_pct_only:
-        return float(m_pct_only.group(1))
-
-    if "abv" not in low:
-        return None
-
-    m = re.search(r"(\d+(?:\.\d+)?)\s*%?\s*abv|abv\s*(\d+(?:\.\d+)?)\s*%?", low)
-    if not m:
-        return None
-
-    num = m.group(1) or m.group(2)
-    return float(num) if num else None
-
+    line = line.strip()
+    m = re.fullmatch(r"(\d+(?:\.\d+)?)\s*%", line)
+    if m:
+        return float(m.group(1))
+    return None
 
 
 def parse_ibu(line: str) -> int | None:
-    """
-    Accept:
-      - "IBU 15"
-      - "15 IBU"
-      - "15"  (numeric-only line, typical for taplist)
-    """
-    low = line.lower().strip()
-
-    # Numeric-only line: treat as IBU if in a sane range
-    m_num_only = re.fullmatch(r"(\d{1,3})", low)
-    if m_num_only:
-        val = int(m_num_only.group(1))
+    line = line.strip()
+    m = re.fullmatch(r"(\d{1,3})", line)
+    if m:
+        val = int(m.group(1))
         if 1 <= val <= 150:
             return val
-        return None
+    return None
 
-    if "ibu" not in low:
-        return None
-
-    m = re.search(r"(\d+)\s*ibu|ibu\s*(\d+)", low)
-    if not m:
-        return None
-
-    num = m.group(1) or m.group(2)
-    return int(num) if num else None
 
 
 
