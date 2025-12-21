@@ -228,15 +228,6 @@
       background: #f9fafb;
       margin-top: 12px;
     }
-
-    a.link {
-      color: #d97706;
-      text-decoration: none;
-    }
-
-    a.link:hover {
-      text-decoration: underline;
-    }
   </style>
 </head>
 <body>
@@ -287,16 +278,7 @@
   </div>
 
   <script>
-    fetch("beers.json")
-  .then(r => r.json())
-  .then(json => {
-    window.beers = json;
-    initFilters();
-    renderBeers();
-  });
-
-
-    // --- Build dynamic filter options from data ---
+    // DOM refs
     const breweryFilter = document.getElementById("breweryFilter");
     const styleFilter = document.getElementById("styleFilter");
     const searchInput = document.getElementById("searchInput");
@@ -305,9 +287,30 @@
     const beerCount = document.getElementById("beerCount");
     const activeFilters = document.getElementById("activeFilters");
 
+    // Load data then init
+    fetch("beers.json")
+      .then(r => r.json())
+      .then(json => {
+        window.beers = Array.isArray(json) ? json : [];
+        initFilters();
+        renderBeers();
+      })
+      .catch(err => {
+        beersContainer.innerHTML = `
+          <div class="empty-state">
+            Could not load beers.json. Check that it exists in the same folder as index.html.
+          </div>
+        `;
+        console.error(err);
+      });
+
+    // --- Build dynamic filter options from data ---
     function initFilters() {
-      const breweryNames = Array.from(new Set(beers.map(b => b.breweryName))).sort();
-      const styles = Array.from(new Set(beers.map(b => b.style))).sort();
+      // breweries
+      const breweryNames = Array.from(new Set(beers.map(b => b.breweryName).filter(Boolean))).sort();
+
+      // styles: filter out null/empty
+      const styles = Array.from(new Set(beers.map(b => b.style).filter(Boolean))).sort();
 
       breweryNames.forEach(name => {
         const opt = document.createElement("option");
@@ -333,8 +336,11 @@
       let filtered = beers.filter(b => {
         if (breweryVal !== "all" && b.breweryName !== breweryVal) return false;
         if (styleVal !== "all" && b.style !== styleVal) return false;
+
         if (searchVal) {
-          const haystack = (b.name + " " + b.description + " " + b.style).toLowerCase();
+          const desc = b.description ? String(b.description) : "";
+          const style = b.style ? String(b.style) : "";
+          const haystack = (String(b.name) + " " + desc + " " + style).toLowerCase();
           if (!haystack.includes(searchVal)) return false;
         }
         return true;
@@ -343,20 +349,25 @@
       const collator = new Intl.Collator("en", { sensitivity: "base" });
 
       filtered.sort((a, b) => {
+        const aStyle = a.style || "";
+        const bStyle = b.style || "";
+
         if (sortVal === "name") {
           return collator.compare(a.name, b.name);
         }
+
         if (sortVal === "style-brewery-name") {
-          const byStyle = collator.compare(a.style, b.style);
+          const byStyle = collator.compare(aStyle, bStyle);
           if (byStyle !== 0) return byStyle;
           const byBrewery = collator.compare(a.breweryName, b.breweryName);
           if (byBrewery !== 0) return byBrewery;
           return collator.compare(a.name, b.name);
         }
+
         // default: brewery-style-name
         const byBrewery = collator.compare(a.breweryName, b.breweryName);
         if (byBrewery !== 0) return byBrewery;
-        const byStyle = collator.compare(a.style, b.style);
+        const byStyle = collator.compare(aStyle, bStyle);
         if (byStyle !== 0) return byStyle;
         return collator.compare(a.name, b.name);
       });
@@ -388,13 +399,14 @@
       // Group by brewery
       const groups = {};
       for (const beer of data) {
-        if (!groups[beer.breweryName]) {
-          groups[beer.breweryName] = {
-            city: beer.city,
+        const bname = beer.breweryName || "Unknown Brewery";
+        if (!groups[bname]) {
+          groups[bname] = {
+            city: beer.breweryCity || beer.city || "",
             beers: []
           };
         }
-        groups[beer.breweryName].beers.push(beer);
+        groups[bname].beers.push(beer);
       }
 
       Object.keys(groups).sort().forEach(breweryName => {
@@ -406,7 +418,7 @@
         header.className = "brewery-header";
         header.innerHTML = `
           <div class="brewery-name">${breweryName}</div>
-          <div class="brewery-meta">${group.city} · ${group.beers.length} beer(s)</div>
+          <div class="brewery-meta">${group.city ? `${group.city} · ` : ""}${group.beers.length} beer(s)</div>
         `;
         section.appendChild(header);
 
@@ -417,18 +429,29 @@
           const card = document.createElement("article");
           card.className = "beer-card";
 
-          const abvStr = beer.abv ? `${beer.abv.toFixed(1)}% ABV` : "ABV N/A";
-          const ibuStr = (typeof beer.ibu === "number") ? `${beer.ibu} IBU` : "IBU N/A";
+          // Build pills only if the value exists
+          let pills = "";
+
+          if (beer.style) {
+            pills += `<span class="pill">${beer.style}</span>`;
+          }
+
+          if (typeof beer.abv === "number") {
+            pills += `<span class="pill secondary">${beer.abv.toFixed(1)}% ABV</span>`;
+          }
+
+          if (typeof beer.ibu === "number") {
+            pills += `<span class="pill secondary">${beer.ibu} IBU</span>`;
+          }
+
+          const pillsBlock = pills ? `<div class="beer-meta">${pills}</div>` : "";
 
           card.innerHTML = `
             <div class="beer-title">${beer.name}</div>
-            <div class="beer-meta">
-              <span class="pill">${beer.style}</span>
-              <span class="pill secondary">${abvStr}</span>
-              <span class="pill secondary">${ibuStr}</span>
-            </div>
+            ${pillsBlock}
             ${beer.description ? `<div class="beer-desc">${beer.description}</div>` : ""}
           `;
+
           grid.appendChild(card);
         });
 
@@ -442,13 +465,6 @@
     styleFilter.addEventListener("change", renderBeers);
     sortSelect.addEventListener("change", renderBeers);
     searchInput.addEventListener("input", renderBeers);
-
-    // Init
-    initFilters();
-    renderBeers();
   </script>
 </body>
 </html>
-
-
-
