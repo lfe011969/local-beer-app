@@ -8,6 +8,12 @@ from bs4 import BeautifulSoup
 
 TAPLIST_URL = "https://taplist.io/taplist-739667"
 
+# Billsburg also maintains a "Beers on Tap" page that usually lists both
+# style and ABV for every beer. Taplist sometimes omits style (and our
+# parser historically missed ABV due to formatting), so we optionally use
+# this page to enrich missing fields.
+BILLSBURG_ON_TAP_URL = "https://billsburg.com/beers-on-tap/"
+
 BREWERY_NAME = "Billsburg Brewery"
 BREWERY_CITY = "Williamsburg"
 
@@ -49,24 +55,105 @@ def fetch_html(url: str) -> str:
     return resp.text
 
 
+def build_name_key(name: str) -> str:
+    """Normalize beer names for fuzzy matching across sources."""
+    return re.sub(r"[^a-z0-9]+", "", name.lower()).strip()
+
+
 def parse_abv(line: str) -> float | None:
+    """Parse ABV.
+
+    Taplist commonly formats ABV as "ABV 5.3%" (not just "5.3%").
+    Billsburg's own site may show just the percent value.
+    """
     line = line.strip()
+    m = re.search(r"\bABV\s*(\d+(?:\.\d+)?)\s*%\b", line, flags=re.IGNORECASE)
+    if m:
+        return float(m.group(1))
+
     m = re.fullmatch(r"(\d+(?:\.\d+)?)\s*%", line)
     if m:
         return float(m.group(1))
+
     return None
 
 
 def parse_ibu(line: str) -> int | None:
+    """Parse IBU.
+
+    Taplist usually formats IBU as "IBU 22". We only accept lines that
+    explicitly contain "IBU" to avoid accidentally treating SRM (e.g.,
+    "SRM 2") as IBU.
+    """
     line = line.strip()
-    m = re.fullmatch(r"(\d{1,3})", line)
-    if m:
-        val = int(m.group(1))
-        if 1 <= val <= 150:
-            return val
+    m = re.search(r"\bIBU\s*(\d{1,3})\b", line, flags=re.IGNORECASE)
+    if not m:
+        return None
+
+    val = int(m.group(1))
+    if 1 <= val <= 150:
+        return val
     return None
 
 
+def enrich_from_billsburg_site(beers: list["BeerRecord"]) -> None:
+    """Fill missing style/abv using Billsburg's own "Beers on Tap" page.
+
+    When the beer list is present in HTML text, it often appears as triplets:
+    Name -> Style -> ABV (e.g., "6.7%"), which we can parse fairly robustly.
+    """
+    try:
+        html = fetch_html(BILLSBURG_ON_TAP_URL)
+    except Exception as e:
+        print("DEBUG: Billsburg site enrichment fetch failed:", e)
+        return
+
+    soup = BeautifulSoup(html, "html.parser")
+    text = soup.get_text("\n", strip=True)
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+
+    mapping: dict[str, dict] = {}
+
+    # Find ABV lines and grab the two preceding lines as (style, name)
+    for idx, ln in enumerate(lines):
+        abv = parse_abv(ln)
+        if abv is None or idx < 2:
+            continue
+
+        style = lines[idx - 1]
+        name = lines[idx - 2]
+
+        # Sanity filters to reduce false positives
+        if len(name) > 80 or len(style) > 60:
+            continue
+        if any(x in style.lower() for x in ["last updated", "powered by", "taplist", "menu"]):
+            continue
+        if any(x in name.lower() for x in ["last updated", "powered by", "taplist", "menu"]):
+            continue
+
+        key = build_name_key(name)
+        if key:
+            mapping[key] = {"style": style, "abv": abv}
+
+    if not mapping:
+        print("DEBUG: Billsburg site enrichment found no ABV triplets; skipping")
+        return
+
+    filled = 0
+    for b in beers:
+        key = build_name_key(b.name)
+        m = mapping.get(key)
+        if not m:
+            continue
+
+        if b.style is None and m.get("style"):
+            b.style = m["style"]
+            filled += 1
+        if b.abv is None and m.get("abv") is not None:
+            b.abv = m["abv"]
+            filled += 1
+
+    print(f"DEBUG: Billsburg site enrichment filled {filled} field(s)")
 
 
 def parse_billsburg_page(html: str):
@@ -76,12 +163,7 @@ def parse_billsburg_page(html: str):
     text = soup.get_text("\n", strip=True)
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
 
-    title = soup.title.get_text(strip=True) if soup.title else "(no title)"
-    print("DEBUG: page title:", title)
-    print("DEBUG: total lines:", len(lines))
-
     beers: list[BeerRecord] = []
-
     current_group = "On Tap"
     current_category = "on_tap"
 
@@ -92,6 +174,7 @@ def parse_billsburg_page(html: str):
         low = line.lower()
         return (
             low.startswith("last updated:")
+            or low.startswith("powered by")
             or "powered by taplist" in low
             or low == "taplist.io"
             or "instant digital menus" in low
@@ -131,7 +214,7 @@ def parse_billsburg_page(html: str):
         while k < len(lines):
             nxt = lines[k]
 
-            # Stop if next beer starts (some line followed by brewery line)
+            # Stop if next beer starts
             if k + 1 < len(lines) and is_brewery_line(lines[k + 1]):
                 break
             if nxt.lower().startswith("coming soon"):
@@ -154,19 +237,21 @@ def parse_billsburg_page(html: str):
                 k += 1
                 continue
 
+            # Ignore SRM lines (not stored in schema)
+            if re.search(r"\bSRM\b", nxt, flags=re.IGNORECASE):
+                k += 1
+                continue
 
             # Style: must not be ABV/IBU/SRM and must not contain '%'
             upper = nxt.upper()
             if style is None:
                 if ("ABV" not in upper) and ("IBU" not in upper) and ("SRM" not in upper):
-                    # Don't treat % lines or pure numbers as style
                     if "%" in nxt:
                         pass
                     elif re.fullmatch(r"\d{1,3}", nxt.strip()):
                         pass
                     elif 2 <= len(nxt) <= 40:
                         style = nxt
-
 
             k += 1
 
@@ -187,21 +272,18 @@ def parse_billsburg_page(html: str):
             )
         )
 
-    print("Parsed", len(beers), "Billsburg beers")
-    for b in beers[:12]:
-        print("DEBUG Billsburg:", b.name, "ABV=", b.abv, "IBU=", b.ibu, "Style=", b.style, "Group=", b.tapGroup)
+    # If Taplist omitted fields, try to enrich from Billsburg's own page.
+    if any((b.abv is None) or (b.style is None) for b in beers):
+        enrich_from_billsburg_site(beers)
 
     return beers
 
 
 def scrape_billsburg_to_json(out: str = "beers_billsburg.json"):
-    print("DEBUG: starting scrape_billsburg_to_json, output:", out)
     html = fetch_html(TAPLIST_URL)
     beers = parse_billsburg_page(html)
-    print("DEBUG: about to write", len(beers), "Billsburg beers")
     with open(out, "w", encoding="utf-8") as f:
         json.dump([asdict(b) for b in beers], f, indent=2, ensure_ascii=False)
-    print("DEBUG: finished writing", out)
 
 
 if __name__ == "__main__":
