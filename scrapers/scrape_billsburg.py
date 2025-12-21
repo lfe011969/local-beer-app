@@ -82,16 +82,27 @@ def parse_billsburg_page(html: str):
         )
 
     def parse_abv(line: str) -> float | None:
-        if "abv" not in line.lower():
-            return None
-        m = re.search(r"(\d+(?:\.\d+)?)", line)
-        return float(m.group(1)) if m else None
+    # Accept: "ABV 5.3%", "5.3% ABV", "5.3%ABV"
+    low = line.lower()
+    if "abv" not in low:
+        return None
+    m = re.search(r"(\d+(?:\.\d+)?)\s*%?\s*abv|abv\s*(\d+(?:\.\d+)?)\s*%?", low)
+    if not m:
+        return None
+    num = m.group(1) or m.group(2)
+    return float(num) if num else None
 
-    def parse_ibu(line: str) -> int | None:
-        if "ibu" not in line.lower():
-            return None
-        m = re.search(r"(\d+)", line)
-        return int(m.group(1)) if m else None
+def parse_ibu(line: str) -> int | None:
+    # Accept: "IBU 15", "15 IBU"
+    low = line.lower()
+    if "ibu" not in low:
+        return None
+    m = re.search(r"(\d+)\s*ibu|ibu\s*(\d+)", low)
+    if not m:
+        return None
+    num = m.group(1) or m.group(2)
+    return int(num) if num else None
+
 
     # Walk through lines and anchor on brewery lines
     for i in range(len(lines)):
@@ -155,16 +166,14 @@ def parse_billsburg_page(html: str):
             if val_ibu is not None:
                 ibu = val_ibu
 
-            # Style line is typically a single word/short phrase (e.g., "Schwarzbier")
             upper = nxt.upper()
-            if (
-                style is None
-                and "ABV" not in upper
-                and "IBU" not in upper
-                and "SRM" not in upper
-                and len(nxt) <= 40
-            ):
-                style = nxt
+
+            # Only consider style if it is NOT an ABV/IBU/SRM line and not a percent line
+            if style is None:
+                if ("ABV" not in upper) and ("IBU" not in upper) and ("SRM" not in upper):
+                    if "%" not in nxt and 2 <= len(nxt) <= 40:
+                        style = nxt
+
 
             k += 1
 
