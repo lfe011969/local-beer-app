@@ -1,12 +1,14 @@
-import re
 import json
+import re
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
+from typing import Optional
 
 import requests
-from bs4 import BeautifulSoup, NavigableString
+from bs4 import BeautifulSoup, Tag
 
-DRINK_MENU_URL = "https://1700brewing.beer/newport-news-1700-brewing-drink-menu"
+# Scrape the VENUE MENU source (1700's site drink menu mirrors their current tap list)
+MENU_URL = "https://1700brewing.beer/newport-news-1700-brewing-drink-menu"
 
 BREWERY_NAME = "1700 Brewing"
 BREWERY_CITY = "Newport News"
@@ -19,11 +21,11 @@ class BeerRecord:
     breweryCity: str
     producerName: str
     name: str
-    style: str | None
-    abv: float | None
-    ibu: int | None
+    style: Optional[str]
+    abv: Optional[float]
+    ibu: Optional[int]
     tapGroup: str
-    category: str          # "on_tap" or "guest_na"
+    category: str
     sourceUrl: str
     lastScraped: str
 
@@ -44,133 +46,187 @@ def fetch_html(url: str) -> str:
             "Chrome/120.0 Safari/537.36"
         )
     }
-    resp = requests.get(url, headers=headers, timeout=20)
-    resp.raise_for_status()
-    return resp.text
+    r = requests.get(url, headers=headers, timeout=30)
+    r.raise_for_status()
+    return r.text
 
 
-def parse_stats_line(line: str):
+def parse_abv_ibu_producer(line: str):
+    """
+    Expected format on 1700 menu page:
+      "5.3% ABV | 22 IBU | 1700 Brewing"
+    Sometimes IBU may be missing or "N/A".
+    """
+    # Normalize separators/spaces
+    raw = " ".join(line.strip().split())
+
+    # Split by pipe
+    parts = [p.strip() for p in raw.split("|")]
+    # parts often: ["5.3% ABV", "22 IBU", "1700 Brewing"]
     abv = None
     ibu = None
-    style_from_line = None
-    producer_name = None
+    producer = BREWERY_NAME
 
-    parts = [p.strip() for p in line.split("|")]
-    if parts:
-        producer_name = parts[-1]
+    # ABV
+    for p in parts:
+        m = re.search(r"(\d+(?:\.\d+)?)\s*%\s*ABV", p, flags=re.I)
+        if m:
+            try:
+                abv = float(m.group(1))
+            except ValueError:
+                abv = None
+            break
 
-    m_abv = re.search(r"(\d+(?:\.\d+)?)\s*%?\s*ABV", line, re.IGNORECASE)
-    if m_abv:
-        abv = float(m_abv.group(1))
+    # IBU
+    for p in parts:
+        # allow "N/A IBU"
+        m = re.search(r"(\d+)\s*IBU", p, flags=re.I)
+        if m:
+            try:
+                ibu = int(m.group(1))
+            except ValueError:
+                ibu = None
+            break
 
-    m_ibu = re.search(r"(\d+|N/A)\s*IBU", line, re.IGNORECASE)
-    if m_ibu:
-        v = m_ibu.group(1).upper()
-        if v != "N/A":
-            ibu = int(v)
+    # Producer: usually last part that isn't ABV/IBU
+    for p in reversed(parts):
+        if re.search(r"ABV", p, flags=re.I):
+            continue
+        if re.search(r"IBU", p, flags=re.I):
+            continue
+        if p and p.lower() != "n/a":
+            producer = p
+            break
 
-    if "•" in line and "|" in line:
-        after = line.split("•", 1)[1]
-        style_from_line = after.split("|", 1)[0].strip()
-
-    return abv, ibu, style_from_line, producer_name
+    return abv, ibu, producer
 
 
-def parse_header(text: str):
-    text = text.strip()
-    m = re.match(r"^\d+\.\s*(.+)$", text)
-    if m:
-        text = m.group(1).strip()
+def parse_beer_heading(h3_text: str):
+    """
+    Heading example:
+      "1. Plain Old Lager (P.O.L.), Lager - Vienna"
+      "8. SchWARz Brr, Schwarzbier/Dark Lager"
+    We want:
+      name = "Plain Old Lager (P.O.L.)"
+      style = "Lager - Vienna"
+    """
+    text = " ".join(h3_text.strip().split())
 
+    # remove leading number like "1." or "12."
+    text = re.sub(r"^\s*\d+\.\s*", "", text)
+
+    # split on first comma
     if "," in text:
-        name_part, style_part = text.split(",", 1)
-        return name_part.strip(), style_part.strip()
+        name, style = text.split(",", 1)
+        name = name.strip()
+        style = style.strip() or None
+    else:
+        name = text.strip()
+        style = None
 
-    return text, None
+    return name, style
 
 
-def parse_1700_page(html: str):
+def scrape_1700_to_json(output_path: str = "beers_1700.json"):
+    print("DEBUG: starting scrape_1700_to_json, output:", output_path)
+
+    html = fetch_html(MENU_URL)
     soup = BeautifulSoup(html, "html.parser")
-    beers = []
+
+    title = soup.title.get_text(strip=True) if soup.title else "(no title)"
+    print("DEBUG: page title:", title)
+
     now = datetime.now(timezone.utc).isoformat()
 
-    headings = soup.find_all(["h2", "h3"])
-    print("DEBUG: found", len(headings), "<h2>/<h3> headings")
-    for h in headings[:10]:
-        print("DEBUG heading:", h.name, "-", h.get_text(" ", strip=True)[:80])
+    beers: list[BeerRecord] = []
 
-    current_group = None
-    current_category = "on_tap"
+    # The page structure (at least currently) uses:
+    # - h2 for tap group headings (e.g., "Air Force Taps - Light / Lager")
+    # - h3 for each beer line
+    current_group = "On Tap"
 
-    for node in headings:
-        text = node.get_text(" ", strip=True)
+    h2_h3 = soup.find_all(["h2", "h3"])
+    print("DEBUG: found", len(h2_h3), "<h2>/<h3> headings")
 
-        # tap group headings
+    for node in h2_h3:
+        if not isinstance(node, Tag):
+            continue
+
         if node.name == "h2":
-            if (
-                "Taps -" in text
-                or "Spec Ops" in text
-                or "Odd Stuff" in text
-                or "Reserves -" in text
-            ):
-                current_group = text
-                current_category = "guest_na" if "Reserves" in text else "on_tap"
+            grp = node.get_text(" ", strip=True)
+            grp = " ".join(grp.split())
+            if grp:
+                current_group = grp
+            continue
+
+        if node.name != "h3":
+            continue
+
+        h3_text = node.get_text(" ", strip=True)
+        h3_text = " ".join(h3_text.split())
+        if not h3_text:
+            continue
+
+        name, style = parse_beer_heading(h3_text)
+
+        # Find the next meaningful text after this h3 which contains ABV/IBU/producer
+        abv = None
+        ibu = None
+        producer = BREWERY_NAME
+
+        info_text = None
+        for sib in node.next_siblings:
+            if isinstance(sib, Tag) and sib.name in {"h2", "h3"}:
+                break
+            if isinstance(sib, Tag):
+                t = sib.get_text(" ", strip=True)
             else:
-                continue
+                t = str(sib).strip()
+            t = " ".join(t.split())
+            if t:
+                info_text = t
+                break
 
-        # beer entries
-        elif node.name == "h3":
-            if not current_group:
-                continue
+        if info_text:
+            abv, ibu, producer = parse_abv_ibu_producer(info_text)
 
-            beer_name, style_from_header = parse_header(text)
+        rec = BeerRecord(
+            id=slugify(f"{BREWERY_NAME}-{name}-{current_group}"),
+            breweryName=BREWERY_NAME,
+            breweryCity=BREWERY_CITY,
+            producerName=producer,
+            name=name,
+            style=style,
+            abv=abv,
+            ibu=ibu,
+            tapGroup=current_group,
+            category="on_tap",
+            sourceUrl=MENU_URL,
+            lastScraped=now,
+        )
+        beers.append(rec)
 
-            stats_node = node.find_next(
-                string=lambda t: isinstance(t, NavigableString)
-                and "ABV" in t
-                and "IBU" in t
-            )
-            if not stats_node:
-                continue
+    print("Parsed", len(beers), "beers from 1700 menu")
+    for b in beers[:10]:
+        print(
+            "DEBUG 1700:",
+            b.tapGroup,
+            "|",
+            b.name,
+            "| style=",
+            b.style,
+            "| abv=",
+            b.abv,
+            "| ibu=",
+            b.ibu,
+            "| producer=",
+            b.producerName,
+        )
 
-            stats_line = stats_node.strip()
-            abv, ibu, style_from_line, producer = parse_stats_line(stats_line)
-            style = style_from_header or style_from_line
-            if not producer:
-                producer = BREWERY_NAME
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump([asdict(b) for b in beers], f, indent=2, ensure_ascii=False)
 
-            beer_id = slugify(f"{BREWERY_NAME}-{beer_name}")
-
-            beers.append(
-                BeerRecord(
-                    id=beer_id,
-                    breweryName=BREWERY_NAME,
-                    breweryCity=BREWERY_CITY,
-                    producerName=producer,
-                    name=beer_name,
-                    style=style,
-                    abv=abv,
-                    ibu=ibu,
-                    tapGroup=current_group,
-                    category=current_category,
-                    sourceUrl=DRINK_MENU_URL,
-                    lastScraped=now,
-                )
-            )
-
-    print("Parsed", len(beers), "beers from 1700")
-    return beers
-
-
-def scrape_1700_to_json(out: str = "beers_1700.json"):
-    print("DEBUG: starting scrape_1700_to_json, output:", out)
-    html = fetch_html(DRINK_MENU_URL)
-    beers = parse_1700_page(html)
-    print("DEBUG: about to write", len(beers), "beers")
-    data = [asdict(b) for b in beers]
-    with open(out, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-    print("DEBUG: finished writing", out)
+    print("DEBUG: finished writing", output_path)
 
 
 if __name__ == "__main__":
