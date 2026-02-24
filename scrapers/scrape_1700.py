@@ -2,13 +2,13 @@ import json
 import re
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List
 
 import requests
 from bs4 import BeautifulSoup, Tag
 
-# Scrape the VENUE MENU source (1700's site drink menu mirrors their current tap list)
-MENU_URL = "https://untappd.com/v/1700-brewing/10975639"
+
+VENUE_URL = "https://untappd.com/v/1700-brewing/10975639"
 
 BREWERY_NAME = "1700 Brewing"
 BREWERY_CITY = "Newport News"
@@ -17,14 +17,14 @@ BREWERY_CITY = "Newport News"
 @dataclass
 class BeerRecord:
     id: str
-    breweryName: str
+    breweryName: str          # venue name (where it’s on tap)
     breweryCity: str
-    producerName: str
+    producerName: str         # brewery that made it (collab/guest taps)
     name: str
     style: Optional[str]
     abv: Optional[float]
     ibu: Optional[int]
-    tapGroup: str
+    tapGroup: str             # section heading on the menu
     category: str
     sourceUrl: str
     lastScraped: str
@@ -51,86 +51,97 @@ def fetch_html(url: str) -> str:
     return r.text
 
 
-def parse_abv_ibu_producer(line: str):
-    """
-    Expected format on 1700 menu page:
-      "5.3% ABV | 22 IBU | 1700 Brewing"
-    Sometimes IBU may be missing or "N/A".
-    """
-    # Normalize separators/spaces
-    raw = " ".join(line.strip().split())
+def strip_tap_number(name: str) -> str:
+    # "2. Scud Light" -> "Scud Light"
+    name = " ".join(name.split())
+    name = re.sub(r"^\s*\d+\.\s*", "", name)
+    return name.strip()
 
-    # Split by pipe
-    parts = [p.strip() for p in raw.split("|")]
-    # parts often: ["5.3% ABV", "22 IBU", "1700 Brewing"]
-    abv = None
-    ibu = None
-    producer = BREWERY_NAME
+
+def parse_style_from_h5(h5: Tag) -> Optional[str]:
+    """
+    Untappd venue menu typically looks like:
+      <h5> <a> 2. Scud Light </a> Lager - American </h5>
+
+    So: style is the text of the h5 minus the <a> text.
+    """
+    a = h5.find("a")
+    full = h5.get_text(" ", strip=True)
+    full = " ".join(full.split())
+
+    if a:
+        a_text = a.get_text(" ", strip=True)
+        a_text = " ".join(a_text.split())
+        # remove linked name portion, remaining becomes style
+        style = full.replace(a_text, "", 1).strip()
+        return style or None
+
+    # Some lines may not have a link; try to split by "  " patterns won't survive,
+    # so we fall back to a few known tokens (rare).
+    return None
+
+
+def parse_abv_ibu_producer(h6: Tag):
+    """
+    Example h6 text:
+      "4% ABV • N/A IBU • 1700 Brewing •"
+      "5.7% ABV • 45 IBU • 1700 Brewing •"
+    Producer is usually a link inside h6.
+    """
+    text = h6.get_text(" ", strip=True)
+    text = " ".join(text.split())
+
+    # producer often inside <a>
+    producer = None
+    a = h6.find("a")
+    if a:
+        producer = " ".join(a.get_text(" ", strip=True).split())
 
     # ABV
-    for p in parts:
-        m = re.search(r"(\d+(?:\.\d+)?)\s*%\s*ABV", p, flags=re.I)
-        if m:
-            try:
-                abv = float(m.group(1))
-            except ValueError:
-                abv = None
-            break
+    abv = None
+    m = re.search(r"(\d+(?:\.\d+)?)\s*%\s*ABV", text, flags=re.I)
+    if m:
+        try:
+            abv = float(m.group(1))
+        except ValueError:
+            abv = None
 
     # IBU
-    for p in parts:
-        # allow "N/A IBU"
-        m = re.search(r"(\d+)\s*IBU", p, flags=re.I)
-        if m:
-            try:
-                ibu = int(m.group(1))
-            except ValueError:
-                ibu = None
-            break
+    ibu = None
+    m = re.search(r"(\d+)\s*IBU", text, flags=re.I)
+    if m:
+        try:
+            ibu = int(m.group(1))
+        except ValueError:
+            ibu = None
 
-    # Producer: usually last part that isn't ABV/IBU
-    for p in reversed(parts):
-        if re.search(r"ABV", p, flags=re.I):
-            continue
-        if re.search(r"IBU", p, flags=re.I):
-            continue
-        if p and p.lower() != "n/a":
+    # If producer link missing, try parse from bullets
+    if not producer:
+        parts = [p.strip() for p in text.split("•") if p.strip()]
+        # pick last part that isn't ABV/IBU
+        for p in reversed(parts):
+            if re.search(r"ABV", p, flags=re.I):
+                continue
+            if re.search(r"IBU", p, flags=re.I):
+                continue
+            # ignore "(3.84)" etc if present
+            if re.fullmatch(r"\(?\d+(?:\.\d+)?\)?", p):
+                continue
             producer = p
             break
+
+    if not producer:
+        producer = BREWERY_NAME
 
     return abv, ibu, producer
 
 
-def parse_beer_heading(h3_text: str):
-    """
-    Heading example:
-      "1. Plain Old Lager (P.O.L.), Lager - Vienna"
-      "8. SchWARz Brr, Schwarzbier/Dark Lager"
-    We want:
-      name = "Plain Old Lager (P.O.L.)"
-      style = "Lager - Vienna"
-    """
-    text = " ".join(h3_text.strip().split())
-
-    # remove leading number like "1." or "12."
-    text = re.sub(r"^\s*\d+\.\s*", "", text)
-
-    # split on first comma
-    if "," in text:
-        name, style = text.split(",", 1)
-        name = name.strip()
-        style = style.strip() or None
-    else:
-        name = text.strip()
-        style = None
-
-    return name, style
-
-
 def scrape_1700_to_json(output_path: str = "beers_1700.json"):
-    print("DEBUG: starting scrape_1700_to_json, output:", output_path)
+    print("DEBUG: starting scrape_1700_to_json (Untappd Venue Menu)")
+    print("DEBUG: url:", VENUE_URL)
+    print("DEBUG: output:", output_path)
 
-    html = fetch_html(MENU_URL)
+    html = fetch_html(VENUE_URL)
     soup = BeautifulSoup(html, "html.parser")
 
     title = soup.title.get_text(strip=True) if soup.title else "(no title)"
@@ -138,75 +149,75 @@ def scrape_1700_to_json(output_path: str = "beers_1700.json"):
 
     now = datetime.now(timezone.utc).isoformat()
 
-    beers: list[BeerRecord] = []
+    # We’ll walk through h4 (group), h5 (beer), h6 (stats) in order.
+    nodes: List[Tag] = soup.find_all(["h4", "h5", "h6"])
+    print("DEBUG: found", len(nodes), "<h4>/<h5>/<h6> tags")
 
-    # The page structure (at least currently) uses:
-    # - h2 for tap group headings (e.g., "Air Force Taps - Light / Lager")
-    # - h3 for each beer line
-    current_group = "On Tap"
+    beers: List[BeerRecord] = []
+    current_group = "Menu"
+    pending = None  # dict with name/style/group while waiting for h6
 
-    h2_h3 = soup.find_all(["h2", "h3"])
-    print("DEBUG: found", len(h2_h3), "<h2>/<h3> headings")
-
-    for node in h2_h3:
+    for node in nodes:
         if not isinstance(node, Tag):
             continue
 
-        if node.name == "h2":
+        if node.name == "h4":
+            # group heading like "Air Force Taps-Light/Lager (4 Items)"
             grp = node.get_text(" ", strip=True)
             grp = " ".join(grp.split())
+            # remove "(X Items)"
+            grp = re.sub(r"\(\s*\d+\s*Items?\s*\)\s*$", "", grp).strip()
             if grp:
                 current_group = grp
             continue
 
-        if node.name != "h3":
-            continue
+        if node.name == "h5":
+            # beer line
+            a = node.find("a")
+            full = node.get_text(" ", strip=True)
+            full = " ".join(full.split())
 
-        h3_text = node.get_text(" ", strip=True)
-        h3_text = " ".join(h3_text.split())
-        if not h3_text:
-            continue
-
-        name, style = parse_beer_heading(h3_text)
-
-        # Find the next meaningful text after this h3 which contains ABV/IBU/producer
-        abv = None
-        ibu = None
-        producer = BREWERY_NAME
-
-        info_text = None
-        for sib in node.next_siblings:
-            if isinstance(sib, Tag) and sib.name in {"h2", "h3"}:
-                break
-            if isinstance(sib, Tag):
-                t = sib.get_text(" ", strip=True)
+            if a:
+                raw_name = a.get_text(" ", strip=True)
+                raw_name = " ".join(raw_name.split())
+                name = strip_tap_number(raw_name)
+                style = parse_style_from_h5(node)
             else:
-                t = str(sib).strip()
-            t = " ".join(t.split())
-            if t:
-                info_text = t
-                break
+                # fallback (rare): whole h5 is name (no style)
+                name = full.strip()
+                style = None
 
-        if info_text:
-            abv, ibu, producer = parse_abv_ibu_producer(info_text)
+            if not name:
+                continue
 
-        rec = BeerRecord(
-            id=slugify(f"{BREWERY_NAME}-{name}-{current_group}"),
-            breweryName=BREWERY_NAME,
-            breweryCity=BREWERY_CITY,
-            producerName=producer,
-            name=name,
-            style=style,
-            abv=abv,
-            ibu=ibu,
-            tapGroup=current_group,
-            category="on_tap",
-            sourceUrl=MENU_URL,
-            lastScraped=now,
-        )
-        beers.append(rec)
+            pending = {
+                "name": name,
+                "style": style,
+                "group": current_group,
+            }
+            continue
 
-    print("Parsed", len(beers), "beers from 1700 menu")
+        if node.name == "h6" and pending:
+            abv, ibu, producer = parse_abv_ibu_producer(node)
+
+            rec = BeerRecord(
+                id=slugify(f"{BREWERY_NAME}-{pending['name']}-{pending['group']}"),
+                breweryName=BREWERY_NAME,
+                breweryCity=BREWERY_CITY,
+                producerName=producer,
+                name=pending["name"],
+                style=pending["style"],
+                abv=abv,
+                ibu=ibu,
+                tapGroup=pending["group"],
+                category="on_tap",
+                sourceUrl=VENUE_URL,
+                lastScraped=now,
+            )
+            beers.append(rec)
+            pending = None
+
+    print("Parsed", len(beers), "beers from 1700 venue menu")
     for b in beers[:10]:
         print(
             "DEBUG 1700:",
