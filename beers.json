@@ -1,227 +1,143 @@
 [
   {
-    "id": "1700-brewing-plain-old-lager-p-o-l-air-force-taps-light-lager",
+    "id": "1700-brewing-receive-venue-notifications-brewery",
     "breweryName": "1700 Brewing",
     "breweryCity": "Newport News",
-    "producerName": "1700 Brewing",
-    "name": "Plain Old Lager (P.O.L.)",
-    "style": "Lager - Vienna",
-    "abv": null,
-    "ibu": null,
-    "tapGroup": "Air Force Taps - Light / Lager",
-    "category": "on_tap",
-    "sourceUrl": "https://1700brewing.beer/newport-news-1700-brewing-drink-menu",
-    "lastScraped": "2026-02-24T01:44:51.052490+00:00"
-  },
-  {
-    "id": "1700-brewing-hurt-lager-air-force-taps-light-lager",
-    "breweryName": "1700 Brewing",
-    "breweryCity": "Newport News",
-    "producerName": "1700 Brewing",
-    "name": "Hurt Lager",
-    "style": "Lager - Světlé (Czech Pale)",
-    "abv": null,
-    "ibu": null,
-    "tapGroup": "Air Force Taps - Light / Lager",
-    "category": "on_tap",
-    "sourceUrl": "https://1700brewing.beer/newport-news-1700-brewing-drink-menu",
-    "lastScraped": "2026-02-24T01:44:51.052490+00:00"
-  },
-  {
-    "id": "1700-brewing-diverted-army-taps-malty-traditional",
-    "breweryName": "1700 Brewing",
-    "breweryCity": "Newport News",
-    "producerName": "1700 Brewing",
-    "name": "Diverted",
-    "style": "Farmhouse Ale - Bière de Garde",
-    "abv": null,
-    "ibu": null,
-    "tapGroup": "Army Taps - Malty / Traditional",
-    "category": "on_tap",
-    "sourceUrl": "https://1700brewing.beer/newport-news-1700-brewing-drink-menu",
-    "lastScraped": "2026-02-24T01:44:51.052490+00:00"
-  },
-  {
-    "id": "1700-brewing-minute-of-angle-moa-army-taps-malty-traditional",
-    "breweryName": "1700 Brewing",
-    "breweryCity": "Newport News",
-    "producerName": "1700 Brewing",
-    "name": "Minute of Angle MOA",
+    "producerName": "Receive alerts via Untappd on your mobile device when this venue adds new beers and/or events!",
+    "name": "Receive Venue Notifications",
     "style": null,
     "abv": null,
     "ibu": null,
-    "tapGroup": "Army Taps - Malty / Traditional",
+    "tapGroup": "Brewery",
     "category": "on_tap",
-    "sourceUrl": "https://1700brewing.beer/newport-news-1700-brewing-drink-menu",
-    "lastScraped": "2026-02-24T01:44:51.052490+00:00"
+    "sourceUrl": "https://untappd.com/v/1700-brewing/10975639",
+    "lastScraped": "2026-02-24T01:56:14.354732+00:00"
   },
   {
-    "id": "1700-brewing-p-o-box-1142-summer-stout-marine-corps-taps-dark-strongs",
+    "id": "1700-brewing-unlock-a-badge-here-brewery",
     "breweryName": "1700 Brewing",
     "breweryCity": "Newport News",
     "producerName": "1700 Brewing",
-    "name": "P.O. Box 1142 (Summer Stout)",
-    "style": "Stout - Oatmeal",
+    "name": "Unlock a Badge Here",
+    "style": null,
     "abv": null,
     "ibu": null,
-    "tapGroup": "Marine Corps Taps - Dark / Strongs",
+    "tapGroup": "Brewery",
     "category": "on_tap",
-    "sourceUrl": "https://1700brewing.beer/newport-news-1700-brewing-drink-menu",
-    "lastScraped": "2026-02-24T01:44:51.052490+00:00"
+    "sourceUrl": "https://untappd.com/v/1700-brewing/10975639",
+    "lastScraped": "2026-02-24T01:56:14.354732+00:00"
   },
   {
-    "id": "1700-brewing-spill-team-six-moscow-mule-coast-guard-taps-fruit-sour",
+    "id": "1700-brewing-hours-brewery",
+    "breweryName": "1700 Brewing",
+    "breweryCity": "Newport News",
+    "producerName": "Monday 3PM - 9PM Tuesday Closed Wednesday 3PM - 9PM Thursday 3PM - 9PM Friday 3PM - 9PM Saturday 12PM - 9PM Sunday 12PM - 7PM",
+    "name": "Hours",
+    "style": null,
+    "abv": null,
+    "ibu": null,
+    "tapGroup": "Brewery",
+    "category": "on_tap",
+    "sourceUrl": "https://untappd.com/v/1700-brewing/10975639",
+    "lastScraped": "2026-02-24T01:56:14.354732+00:00"
+  },
+  {
+    "id": "1700-brewing-details-brewery",
+    "breweryName": "1700 Brewing",
+    "breweryCity": "Newport News",
+    "producerName": "Payment Types: Visa, Google Pay, Master Card, Check, Cash, Apple Pay, American Express Growlers Outdoor Seating Pet Friendly Child Friendly",
+    "name": "Details",
+    "style": null,
+    "abv": null,
+    "ibu": null,
+    "tapGroup": "Brewery",
+    "category": "on_tap",
+    "sourceUrl": "https://untappd.com/v/1700-brewing/10975639",
+    "lastScraped": "2026-02-24T01:56:14.354732+00:00"
+  },
+  {
+    "id": "1700-brewing-social-brewery",
+    "breweryName": "1700 Brewing",
+    "breweryCity": "Newport News",
+    "producerName": "Yelp",
+    "name": "Social",
+    "style": null,
+    "abv": null,
+    "ibu": null,
+    "tapGroup": "Brewery",
+    "category": "on_tap",
+    "sourceUrl": "https://untappd.com/v/1700-brewing/10975639",
+    "lastScraped": "2026-02-24T01:56:14.354732+00:00"
+  },
+  {
+    "id": "1700-brewing-venue-stats-brewery",
+    "breweryName": "1700 Brewing",
+    "breweryCity": "Newport News",
+    "producerName": "10,924 Total 1,201 Unique 158 Monthly 0 You",
+    "name": "Venue Stats ( ? )",
+    "style": null,
+    "abv": null,
+    "ibu": null,
+    "tapGroup": "Brewery",
+    "category": "on_tap",
+    "sourceUrl": "https://untappd.com/v/1700-brewing/10975639",
+    "lastScraped": "2026-02-24T01:56:14.354732+00:00"
+  },
+  {
+    "id": "1700-brewing-loyal-patrons-brewery",
     "breweryName": "1700 Brewing",
     "breweryCity": "Newport News",
     "producerName": "1700 Brewing",
-    "name": "Spill Team Six (Moscow Mule)",
-    "style": "Sour - Fruited Gose",
+    "name": "Loyal Patrons ( ? )",
+    "style": null,
     "abv": null,
     "ibu": null,
-    "tapGroup": "Coast Guard Taps - Fruit / Sour",
+    "tapGroup": "Brewery",
     "category": "on_tap",
-    "sourceUrl": "https://1700brewing.beer/newport-news-1700-brewing-drink-menu",
-    "lastScraped": "2026-02-24T01:44:51.052490+00:00"
+    "sourceUrl": "https://untappd.com/v/1700-brewing/10975639",
+    "lastScraped": "2026-02-24T01:56:14.354732+00:00"
   },
   {
-    "id": "1700-brewing-warheads-on-foreheads-coast-guard-taps-fruit-sour",
+    "id": "1700-brewing-photos-brewery",
     "breweryName": "1700 Brewing",
     "breweryCity": "Newport News",
-    "producerName": "1700 Brewing",
-    "name": "Warheads On Foreheads",
-    "style": "Sour - Fruited",
+    "producerName": "See More Photos",
+    "name": "Photos",
+    "style": null,
     "abv": null,
     "ibu": null,
-    "tapGroup": "Coast Guard Taps - Fruit / Sour",
+    "tapGroup": "Brewery",
     "category": "on_tap",
-    "sourceUrl": "https://1700brewing.beer/newport-news-1700-brewing-drink-menu",
-    "lastScraped": "2026-02-24T01:44:51.052490+00:00"
+    "sourceUrl": "https://untappd.com/v/1700-brewing/10975639",
+    "lastScraped": "2026-02-24T01:56:14.354732+00:00"
   },
   {
-    "id": "1700-brewing-zero-puckers-given-coast-guard-taps-fruit-sour",
+    "id": "1700-brewing-recent-activity-brewery",
     "breweryName": "1700 Brewing",
     "breweryCity": "Newport News",
-    "producerName": "1700 Brewing",
-    "name": "Zero Puckers Given",
-    "style": "Hard Lemonade",
+    "producerName": "Tue, 24 Feb 2026 01:22:55 +0000 Yvette M Alentines Wild Strawberry Pale Ale 1700 Brewing Mon, 23 Feb 2026 23:57:12 +0000 Matt H Y'All Having A Party Alewerks Brewing Company Mon, 23 Feb 2026 23:45:58 +0000 Juan D Alentines Wild Strawberry Pale Ale 1700 Brewing Mon, 23 Feb 2026 23:45:29 +0000 Juan D BOSNIA 1700 Brewing Mon, 23 Feb 2026 23:19:51 +0000 Andrea Garner Present Arms (Incognito) 1700 Brewing",
+    "name": "Recent Activity",
+    "style": null,
     "abv": null,
     "ibu": null,
-    "tapGroup": "Coast Guard Taps - Fruit / Sour",
+    "tapGroup": "Brewery",
     "category": "on_tap",
-    "sourceUrl": "https://1700brewing.beer/newport-news-1700-brewing-drink-menu",
-    "lastScraped": "2026-02-24T01:44:51.052490+00:00"
+    "sourceUrl": "https://untappd.com/v/1700-brewing/10975639",
+    "lastScraped": "2026-02-24T01:56:14.354732+00:00"
   },
   {
-    "id": "1700-brewing-marksman-barrel-aged-blend-spec-ops",
+    "id": "1700-brewing-all-menus-brewery",
     "breweryName": "1700 Brewing",
     "breweryCity": "Newport News",
-    "producerName": "1700 Brewing",
-    "name": "Marksman (Barrel Aged Blend)",
-    "style": "Aged Bière de Garde",
+    "producerName": "Offering : 25 Beers",
+    "name": "All Menus",
+    "style": null,
     "abv": null,
     "ibu": null,
-    "tapGroup": "Spec Ops",
+    "tapGroup": "Brewery",
     "category": "on_tap",
-    "sourceUrl": "https://1700brewing.beer/newport-news-1700-brewing-drink-menu",
-    "lastScraped": "2026-02-24T01:44:51.052490+00:00"
-  },
-  {
-    "id": "1700-brewing-rizm-with-the-tism-spec-ops",
-    "breweryName": "1700 Brewing",
-    "breweryCity": "Newport News",
-    "producerName": "1700 Brewing",
-    "name": "Rizm With the Tism",
-    "style": "Hopped Blonde / Saison",
-    "abv": null,
-    "ibu": null,
-    "tapGroup": "Spec Ops",
-    "category": "on_tap",
-    "sourceUrl": "https://1700brewing.beer/newport-news-1700-brewing-drink-menu",
-    "lastScraped": "2026-02-24T01:44:51.052490+00:00"
-  },
-  {
-    "id": "1700-brewing-margarita-slush-space-force-taps-odd-stuff",
-    "breweryName": "1700 Brewing",
-    "breweryCity": "Newport News",
-    "producerName": "1700 Brewing",
-    "name": "Margarita Slush",
-    "style": "Rita Drank",
-    "abv": null,
-    "ibu": null,
-    "tapGroup": "Space Force Taps - Odd Stuff",
-    "category": "on_tap",
-    "sourceUrl": "https://1700brewing.beer/newport-news-1700-brewing-drink-menu",
-    "lastScraped": "2026-02-24T01:44:51.052490+00:00"
-  },
-  {
-    "id": "1700-brewing-strawberry-slush-space-force-taps-odd-stuff",
-    "breweryName": "1700 Brewing",
-    "breweryCity": "Newport News",
-    "producerName": "1700 Brewing",
-    "name": "Strawberry Slush",
-    "style": "Red Drank",
-    "abv": null,
-    "ibu": null,
-    "tapGroup": "Space Force Taps - Odd Stuff",
-    "category": "on_tap",
-    "sourceUrl": "https://1700brewing.beer/newport-news-1700-brewing-drink-menu",
-    "lastScraped": "2026-02-24T01:44:51.052490+00:00"
-  },
-  {
-    "id": "1700-brewing-downwinder-gose-reserves-non-alcoholic",
-    "breweryName": "1700 Brewing",
-    "breweryCity": "Newport News",
-    "producerName": "1700 Brewing",
-    "name": "Downwinder Gose",
-    "style": "Non-Alcoholic - Sour",
-    "abv": null,
-    "ibu": null,
-    "tapGroup": "Reserves - Non-Alcoholic",
-    "category": "on_tap",
-    "sourceUrl": "https://1700brewing.beer/newport-news-1700-brewing-drink-menu",
-    "lastScraped": "2026-02-24T01:44:51.052490+00:00"
-  },
-  {
-    "id": "1700-brewing-wits-peak-reserves-non-alcoholic",
-    "breweryName": "1700 Brewing",
-    "breweryCity": "Newport News",
-    "producerName": "1700 Brewing",
-    "name": "Wit’s Peak",
-    "style": "Non-Alcoholic - Wheat",
-    "abv": null,
-    "ibu": null,
-    "tapGroup": "Reserves - Non-Alcoholic",
-    "category": "on_tap",
-    "sourceUrl": "https://1700brewing.beer/newport-news-1700-brewing-drink-menu",
-    "lastScraped": "2026-02-24T01:44:51.052490+00:00"
-  },
-  {
-    "id": "1700-brewing-personal-record-reserves-non-alcoholic",
-    "breweryName": "1700 Brewing",
-    "breweryCity": "Newport News",
-    "producerName": "1700 Brewing",
-    "name": "Personal Record",
-    "style": "Non-Alcoholic - IPA",
-    "abv": null,
-    "ibu": null,
-    "tapGroup": "Reserves - Non-Alcoholic",
-    "category": "on_tap",
-    "sourceUrl": "https://1700brewing.beer/newport-news-1700-brewing-drink-menu",
-    "lastScraped": "2026-02-24T01:44:51.052490+00:00"
-  },
-  {
-    "id": "1700-brewing-first-ride-reserves-non-alcoholic",
-    "breweryName": "1700 Brewing",
-    "breweryCity": "Newport News",
-    "producerName": "1700 Brewing",
-    "name": "First Ride",
-    "style": "Non-Alcoholic - Porter / Stout",
-    "abv": null,
-    "ibu": null,
-    "tapGroup": "Reserves - Non-Alcoholic",
-    "category": "on_tap",
-    "sourceUrl": "https://1700brewing.beer/newport-news-1700-brewing-drink-menu",
-    "lastScraped": "2026-02-24T01:44:51.052490+00:00"
+    "sourceUrl": "https://untappd.com/v/1700-brewing/10975639",
+    "lastScraped": "2026-02-24T01:56:14.354732+00:00"
   },
   {
     "id": "billsburg-brewery-classic-lager",
@@ -235,7 +151,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://taplist.io/taplist-739667",
-    "lastScraped": "2026-02-24T01:44:51.796379+00:00"
+    "lastScraped": "2026-02-24T01:56:15.110014+00:00"
   },
   {
     "id": "billsburg-brewery-fly-away",
@@ -249,7 +165,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://taplist.io/taplist-739667",
-    "lastScraped": "2026-02-24T01:44:51.796379+00:00"
+    "lastScraped": "2026-02-24T01:56:15.110014+00:00"
   },
   {
     "id": "billsburg-brewery-colonel-ebirt",
@@ -263,7 +179,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://taplist.io/taplist-739667",
-    "lastScraped": "2026-02-24T01:44:51.796379+00:00"
+    "lastScraped": "2026-02-24T01:56:15.110014+00:00"
   },
   {
     "id": "billsburg-brewery-walk-on",
@@ -277,7 +193,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://taplist.io/taplist-739667",
-    "lastScraped": "2026-02-24T01:44:51.796379+00:00"
+    "lastScraped": "2026-02-24T01:56:15.110014+00:00"
   },
   {
     "id": "billsburg-brewery-invisible-light",
@@ -291,7 +207,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://taplist.io/taplist-739667",
-    "lastScraped": "2026-02-24T01:44:51.796379+00:00"
+    "lastScraped": "2026-02-24T01:56:15.110014+00:00"
   },
   {
     "id": "billsburg-brewery-boat-trip",
@@ -305,7 +221,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://taplist.io/taplist-739667",
-    "lastScraped": "2026-02-24T01:44:51.796379+00:00"
+    "lastScraped": "2026-02-24T01:56:15.110014+00:00"
   },
   {
     "id": "billsburg-brewery-tourist-trap-66",
@@ -319,7 +235,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://taplist.io/taplist-739667",
-    "lastScraped": "2026-02-24T01:44:51.796379+00:00"
+    "lastScraped": "2026-02-24T01:56:15.110014+00:00"
   },
   {
     "id": "billsburg-brewery-bavarian-brew",
@@ -333,7 +249,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://taplist.io/taplist-739667",
-    "lastScraped": "2026-02-24T01:44:51.796379+00:00"
+    "lastScraped": "2026-02-24T01:56:15.110014+00:00"
   },
   {
     "id": "billsburg-brewery-betty-the-hefe",
@@ -347,7 +263,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://taplist.io/taplist-739667",
-    "lastScraped": "2026-02-24T01:44:51.796379+00:00"
+    "lastScraped": "2026-02-24T01:56:15.110014+00:00"
   },
   {
     "id": "billsburg-brewery-planet-4-red-ale",
@@ -361,7 +277,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://taplist.io/taplist-739667",
-    "lastScraped": "2026-02-24T01:44:51.796379+00:00"
+    "lastScraped": "2026-02-24T01:56:15.110014+00:00"
   },
   {
     "id": "billsburg-brewery-ghost-wind",
@@ -375,7 +291,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://taplist.io/taplist-739667",
-    "lastScraped": "2026-02-24T01:44:51.796379+00:00"
+    "lastScraped": "2026-02-24T01:56:15.110014+00:00"
   },
   {
     "id": "billsburg-brewery-berliner-weisse",
@@ -389,7 +305,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://taplist.io/taplist-739667",
-    "lastScraped": "2026-02-24T01:44:51.796379+00:00"
+    "lastScraped": "2026-02-24T01:56:15.110014+00:00"
   },
   {
     "id": "billsburg-brewery-settlemint-or-lime-margarita-or-orange-crush",
@@ -403,7 +319,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://taplist.io/taplist-739667",
-    "lastScraped": "2026-02-24T01:44:51.796379+00:00"
+    "lastScraped": "2026-02-24T01:56:15.110014+00:00"
   },
   {
     "id": "billsburg-brewery-aftershock-margarita",
@@ -417,7 +333,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://taplist.io/taplist-739667",
-    "lastScraped": "2026-02-24T01:44:51.796379+00:00"
+    "lastScraped": "2026-02-24T01:56:15.110014+00:00"
   },
   {
     "id": "billsburg-brewery-winter-crush",
@@ -431,7 +347,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://taplist.io/taplist-739667",
-    "lastScraped": "2026-02-24T01:44:51.796379+00:00"
+    "lastScraped": "2026-02-24T01:56:15.110014+00:00"
   },
   {
     "id": "billsburg-brewery-berry-mojito",
@@ -445,7 +361,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://taplist.io/taplist-739667",
-    "lastScraped": "2026-02-24T01:44:51.796379+00:00"
+    "lastScraped": "2026-02-24T01:56:15.110014+00:00"
   },
   {
     "id": "billsburg-brewery-driftin-pale-ale",
@@ -459,7 +375,7 @@
     "tapGroup": "Coming Soon",
     "category": "coming_soon",
     "sourceUrl": "https://taplist.io/taplist-739667",
-    "lastScraped": "2026-02-24T01:44:51.796379+00:00"
+    "lastScraped": "2026-02-24T01:56:15.110014+00:00"
   },
   {
     "id": "tradition-brewing-company-temper-tantrum",
@@ -473,7 +389,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://traditionbrewing.com/location/taproom/",
-    "lastScraped": "2026-02-24T01:44:53.061900+00:00"
+    "lastScraped": "2026-02-24T01:56:16.078741+00:00"
   },
   {
     "id": "tradition-brewing-company-wine-barrel-aged-trinity",
@@ -487,7 +403,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://traditionbrewing.com/location/taproom/",
-    "lastScraped": "2026-02-24T01:44:53.061900+00:00"
+    "lastScraped": "2026-02-24T01:56:16.078741+00:00"
   },
   {
     "id": "tradition-brewing-company-full-shrub",
@@ -501,7 +417,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://traditionbrewing.com/location/taproom/",
-    "lastScraped": "2026-02-24T01:44:53.061900+00:00"
+    "lastScraped": "2026-02-24T01:56:16.078741+00:00"
   },
   {
     "id": "tradition-brewing-company-otto",
@@ -515,7 +431,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://traditionbrewing.com/location/taproom/",
-    "lastScraped": "2026-02-24T01:44:53.061900+00:00"
+    "lastScraped": "2026-02-24T01:56:16.078741+00:00"
   },
   {
     "id": "tradition-brewing-company-tradition-ator",
@@ -529,7 +445,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://traditionbrewing.com/location/taproom/",
-    "lastScraped": "2026-02-24T01:44:53.061900+00:00"
+    "lastScraped": "2026-02-24T01:56:16.078741+00:00"
   },
   {
     "id": "tradition-brewing-company-no-mans-land",
@@ -543,7 +459,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://traditionbrewing.com/location/taproom/",
-    "lastScraped": "2026-02-24T01:44:53.061900+00:00"
+    "lastScraped": "2026-02-24T01:56:16.078741+00:00"
   },
   {
     "id": "tradition-brewing-company-before-the-mast",
@@ -557,7 +473,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://traditionbrewing.com/location/taproom/",
-    "lastScraped": "2026-02-24T01:44:53.061900+00:00"
+    "lastScraped": "2026-02-24T01:56:16.078741+00:00"
   },
   {
     "id": "tradition-brewing-company-shadow-striker",
@@ -571,7 +487,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://traditionbrewing.com/location/taproom/",
-    "lastScraped": "2026-02-24T01:44:53.061900+00:00"
+    "lastScraped": "2026-02-24T01:56:16.078741+00:00"
   },
   {
     "id": "tradition-brewing-company-witner-wonderland",
@@ -585,7 +501,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://traditionbrewing.com/location/taproom/",
-    "lastScraped": "2026-02-24T01:44:53.061900+00:00"
+    "lastScraped": "2026-02-24T01:56:16.078741+00:00"
   },
   {
     "id": "tradition-brewing-company-rasselbock",
@@ -599,7 +515,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://traditionbrewing.com/location/taproom/",
-    "lastScraped": "2026-02-24T01:44:53.061900+00:00"
+    "lastScraped": "2026-02-24T01:56:16.078741+00:00"
   },
   {
     "id": "tradition-brewing-company-distorter",
@@ -613,7 +529,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://traditionbrewing.com/location/taproom/",
-    "lastScraped": "2026-02-24T01:44:53.061900+00:00"
+    "lastScraped": "2026-02-24T01:56:16.078741+00:00"
   },
   {
     "id": "tradition-brewing-company-wine-barrel-aged-thank-you-for-being-a-friend",
@@ -627,7 +543,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://traditionbrewing.com/location/taproom/",
-    "lastScraped": "2026-02-24T01:44:53.061900+00:00"
+    "lastScraped": "2026-02-24T01:56:16.078741+00:00"
   },
   {
     "id": "tradition-brewing-company-captains-lager",
@@ -641,7 +557,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://traditionbrewing.com/location/taproom/",
-    "lastScraped": "2026-02-24T01:44:53.061900+00:00"
+    "lastScraped": "2026-02-24T01:56:16.078741+00:00"
   },
   {
     "id": "tradition-brewing-company-tradition-honey-brown-ale",
@@ -655,7 +571,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://traditionbrewing.com/location/taproom/",
-    "lastScraped": "2026-02-24T01:44:53.061900+00:00"
+    "lastScraped": "2026-02-24T01:56:16.078741+00:00"
   },
   {
     "id": "tradition-brewing-company-blood-orange-gose",
@@ -669,7 +585,7 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://traditionbrewing.com/location/taproom/",
-    "lastScraped": "2026-02-24T01:44:53.061900+00:00"
+    "lastScraped": "2026-02-24T01:56:16.078741+00:00"
   },
   {
     "id": "tradition-brewing-company-ipa-thirteen",
@@ -683,6 +599,6 @@
     "tapGroup": "On Tap",
     "category": "on_tap",
     "sourceUrl": "https://traditionbrewing.com/location/taproom/",
-    "lastScraped": "2026-02-24T01:44:53.061900+00:00"
+    "lastScraped": "2026-02-24T01:56:16.078741+00:00"
   }
 ]
