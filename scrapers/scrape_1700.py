@@ -8,7 +8,7 @@ import requests
 from bs4 import BeautifulSoup, Tag
 
 # Scrape the VENUE MENU source (1700's site drink menu mirrors their current tap list)
-MENU_URL = "https://1700brewing.beer/newport-news-1700-brewing-drink-menu"
+MENU_URL = "https://untappd.com/v/1700-brewing/10975639"
 
 BREWERY_NAME = "1700 Brewing"
 BREWERY_CITY = "Newport News"
